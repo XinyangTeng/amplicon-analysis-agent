@@ -38,7 +38,9 @@ def _duplicates(items: list[str]) -> list[str]:
     return sorted(duplicates)
 
 
-def inspect_inputs(abundance: str, taxonomy: str, metadata: str, group_column: str) -> InspectionResult:
+def inspect_inputs(abundance: str, taxonomy: str, metadata: str, group_column: str,
+                   batch_column: str | None = None,
+                   gradient_column: str | None = None) -> InspectionResult:
     paths = {
         "abundance": secure_path(abundance),
         "taxonomy": secure_path(taxonomy),
@@ -80,6 +82,10 @@ def inspect_inputs(abundance: str, taxonomy: str, metadata: str, group_column: s
         blockers.append("metadata contains duplicate Sample IDs")
     if group_column not in meta.columns:
         blockers.append(f"metadata is missing group column: {group_column}")
+    if batch_column and batch_column not in meta.columns:
+        blockers.append(f"metadata is missing batch column: {batch_column}")
+    if gradient_column and gradient_column not in meta.columns:
+        blockers.append(f"metadata is missing gradient column: {gradient_column}")
 
     abd_columns = [str(x).strip() for x in abd.columns[1:]]
     meta_set = set(sample_ids)
@@ -127,6 +133,23 @@ def inspect_inputs(abundance: str, taxonomy: str, metadata: str, group_column: s
         if any(v < 2 for v in groups.values()):
             warnings.append("At least one group has fewer than two samples; group significance tests will be skipped")
 
+    design_summary: dict[str, object] = {}
+    if batch_column and batch_column in meta.columns:
+        batches: dict[str, object] = {}
+        for batch, frame in meta.groupby(batch_column, dropna=False):
+            batch_groups = {str(k): int(v) for k, v in frame[group_column].value_counts().items()}
+            batch_info: dict[str, object] = {"sample_count": len(frame), "groups": batch_groups}
+            if gradient_column and gradient_column in frame.columns:
+                gradient = pd.to_numeric(frame[gradient_column], errors="coerce")
+                observed = sorted({float(x) for x in gradient.dropna()})
+                if observed:
+                    batch_info["gradient_levels"] = observed
+                    batch_info["gradient_complete"] = len(observed) >= 3
+            batches[str(batch)] = batch_info
+        design_summary = {"batch_column": batch_column, "batches": batches}
+        if len(batches) > 1:
+            warnings.append("Multiple experiment batches detected; inferential tests will be stratified by batch")
+
     ranks = [rank for rank in RANK_ORDER if rank in tax.columns]
     if not ranks:
         ranks = [str(c) for c in tax.columns[1:]]
@@ -153,4 +176,5 @@ def inspect_inputs(abundance: str, taxonomy: str, metadata: str, group_column: s
         warnings=warnings,
         blockers=blockers,
         metrics={"zero_fraction": round(zero_fraction, 6)},
+        design_summary=design_summary,
     )

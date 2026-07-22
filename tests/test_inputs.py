@@ -41,3 +41,18 @@ def test_negative_counts_are_blocked(monkeypatch, tmp_path):
     assert result.status == "blocked"
     assert any("negative" in item for item in result.blockers)
 
+
+def test_batch_and_ordered_gradient_design_is_summarized(monkeypatch, tmp_path):
+    monkeypatch.setenv("AMPLICON_WORKSPACE", str(tmp_path))
+    (tmp_path / "abundance.csv").write_bytes((DEMO / "abundance.csv").read_bytes())
+    (tmp_path / "taxonomy.csv").write_bytes((DEMO / "taxonomy.csv").read_bytes())
+    metadata = pd.read_csv(DEMO / "metadata.csv")
+    metadata["Batch"] = ["categorical"] * 3 + ["gradient"] * 3
+    metadata["Intensity"] = [None, None, None, 1, 2, 3]
+    metadata.to_csv(tmp_path / "metadata.csv", index=False)
+    result = inspect_inputs(
+        "abundance.csv", "taxonomy.csv", "metadata.csv", "Group", "Batch", "Intensity"
+    )
+    assert result.status == "warning"
+    assert set(result.design_summary["batches"]) == {"categorical", "gradient"}
+    assert result.design_summary["batches"]["gradient"]["gradient_levels"] == [1.0, 2.0, 3.0]

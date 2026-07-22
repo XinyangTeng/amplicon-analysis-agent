@@ -14,13 +14,16 @@ parser.add_argument("--abundance", default="examples/demo/abundance.csv")
 parser.add_argument("--taxonomy", default="examples/demo/taxonomy.csv")
 parser.add_argument("--metadata", default="examples/demo/metadata.csv")
 parser.add_argument("--group-column", default="Group")
+parser.add_argument("--batch-column")
+parser.add_argument("--gradient-column")
 args = parser.parse_args()
 
 root = Path(__file__).parents[1].resolve()
 os.environ["AMPLICON_WORKSPACE"] = str((args.workspace or root).resolve())
 service = AgentService()
 contract = service.prepare(
-    args.abundance, args.taxonomy, args.metadata, args.group_column
+    args.abundance, args.taxonomy, args.metadata, args.group_column,
+    batch_column=args.batch_column, gradient_column=args.gradient_column
 )
 print(json.dumps(contract, ensure_ascii=False, indent=2))
 if contract["blockers"]:

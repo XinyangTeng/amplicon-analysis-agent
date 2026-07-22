@@ -17,7 +17,7 @@ EXPECTED_OUTPUTS = [
     "analysis_contract.json", "run_manifest.json", "validation.json", "report.html",
     "tables/qc_summary.csv", "tables/alpha_diversity.csv", "tables/pcoa_coordinates.csv",
     "tables/composition_relative_abundance.csv", "figures/alpha_diversity.png",
-    "figures/pcoa.png", "figures/composition.png", "logs/r-analysis.log",
+    "tables/stratified_tests.json", "figures/pcoa.png", "figures/composition.png", "logs/r-analysis.log",
 ]
 
 
@@ -25,12 +25,14 @@ class AgentService:
     def __init__(self, store: PlanStore | None = None) -> None:
         self.store = store or PlanStore()
 
-    def inspect(self, abundance: str, taxonomy: str, metadata: str, group_column: str) -> dict:
-        return inspect_inputs(abundance, taxonomy, metadata, group_column).model_dump()
+    def inspect(self, abundance: str, taxonomy: str, metadata: str, group_column: str,
+                batch_column: str | None = None, gradient_column: str | None = None) -> dict:
+        return inspect_inputs(abundance, taxonomy, metadata, group_column, batch_column, gradient_column).model_dump()
 
     def prepare(self, abundance: str, taxonomy: str, metadata: str, group_column: str,
-                modules: list[str] | None = None, permutations: int = 999, top_n: int = 10) -> dict:
-        inspection = inspect_inputs(abundance, taxonomy, metadata, group_column)
+                modules: list[str] | None = None, permutations: int = 999, top_n: int = 10,
+                batch_column: str | None = None, gradient_column: str | None = None) -> dict:
+        inspection = inspect_inputs(abundance, taxonomy, metadata, group_column, batch_column, gradient_column)
         selected_modules = modules or ["qc", "alpha", "beta", "composition"]
         allowed = {"qc", "alpha", "beta", "composition"}
         invalid = sorted(set(selected_modules) - allowed)
@@ -46,6 +48,8 @@ class AgentService:
             files=inspection.files,
             file_hashes=inspection.file_hashes,
             group_column=group_column,
+            batch_column=batch_column,
+            gradient_column=gradient_column,
             orientation=inspection.orientation,
             transpose_abundance=inspection.transpose_abundance,
             modules=selected_modules,
@@ -145,4 +149,3 @@ class AgentService:
             path = secure_path(path_value)
             if sha256_file(path) != contract.file_hashes[name]:
                 raise ValueError(f"Input changed after plan creation: {name}")
-

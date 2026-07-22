@@ -16,17 +16,21 @@ service = AgentService()
 
 
 @mcp.tool()
-def inspect_amplicon_inputs(abundance: str, taxonomy: str, metadata: str, group_column: str) -> dict:
+def inspect_amplicon_inputs(abundance: str, taxonomy: str, metadata: str, group_column: str,
+                            batch_column: str | None = None,
+                            gradient_column: str | None = None) -> dict:
     """Inspect three amplicon tables without running analysis."""
-    return service.inspect(abundance, taxonomy, metadata, group_column)
+    return service.inspect(abundance, taxonomy, metadata, group_column, batch_column, gradient_column)
 
 
 @mcp.tool()
 def prepare_amplicon_analysis(abundance: str, taxonomy: str, metadata: str, group_column: str,
                                modules: list[str] | None = None, permutations: int = 999,
-                               top_n: int = 10) -> dict:
+                               top_n: int = 10, batch_column: str | None = None,
+                               gradient_column: str | None = None) -> dict:
     """Create an immutable analysis contract. This does not execute analysis."""
-    return service.prepare(abundance, taxonomy, metadata, group_column, modules, permutations, top_n)
+    return service.prepare(abundance, taxonomy, metadata, group_column, modules, permutations, top_n,
+                           batch_column, gradient_column)
 
 
 @mcp.tool()
@@ -65,4 +69,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

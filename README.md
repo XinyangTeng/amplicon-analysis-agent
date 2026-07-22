@@ -11,6 +11,8 @@
 - HTML 报告和机器可读 JSON；
 - 所有文件访问限制在 `AMPLICON_WORKSPACE` 内；
 - 无有效重复时自动跳过不适用的显著性检验。
+- 支持按 `batch_column` 分层推断，避免实验批次与处理效应混杂；
+- 支持通过 `gradient_column` 分析连续增强的胁迫梯度。
 
 ## 本地运行
 
@@ -60,6 +62,8 @@ claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e
 ## MCP 工具
 
 `inspect_amplicon_inputs`、`prepare_amplicon_analysis`、`approve_analysis`、`run_amplicon_analysis`、`get_run_status`、`validate_amplicon_results`、`get_analysis_report`。
+
+多实验数据应在检查和计划工具中同时传入 `batch_column`。剂量、时间或胁迫强度为有序数值时传入 `gradient_column`。此时分类实验在批次内部运行 Kruskal–Wallis、PERMANOVA 与离散度检验；完整数值梯度运行 Spearman Alpha 趋势和连续变量 PERMANOVA。Agent 不执行跨批次的总体显著性检验。
 
 ## EMO 函数来源
 

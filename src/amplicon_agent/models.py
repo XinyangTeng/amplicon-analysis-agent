@@ -30,15 +30,18 @@ class InspectionResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
     metrics: dict[str, float | int | str] = Field(default_factory=dict)
+    design_summary: dict[str, object] = Field(default_factory=dict)
 
 
 class AnalysisContract(BaseModel):
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     plan_id: str
     created_at: str = Field(default_factory=utc_now)
     files: InputFiles
     file_hashes: dict[str, str]
     group_column: str
+    batch_column: str | None = None
+    gradient_column: str | None = None
     orientation: str
     transpose_abundance: bool
     modules: list[Literal["qc", "alpha", "beta", "composition"]]
@@ -66,4 +69,3 @@ class RunResult(BaseModel):
     report_path: str | None = None
     validation_path: str | None = None
     error: str | None = None
-

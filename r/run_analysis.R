@@ -76,12 +76,13 @@ p_alpha <- ggplot(alpha_long, aes(group, value, fill = group)) +
   theme(legend.position = "none") + labs(x = contract$group_column, y = NULL)
 ggsave(file.path(output_dir, "figures", "alpha_diversity.png"), p_alpha, width = 10, height = 4.5, dpi = 160)
 
-alpha_tests <- list()
+alpha_tests <- list(skipped = TRUE, reason = "Overall test disabled when a batch column is supplied")
 has_replicated_groups <- nlevels(group) >= 2 && all(table(group) >= 2)
-if (has_replicated_groups) {
+if (has_replicated_groups && is.null(contract$batch_column)) {
+  alpha_tests <- list(skipped = FALSE, tests = list())
   for (metric in c("Observed", "Shannon", "Simpson")) {
     test <- kruskal.test(alpha[[metric]] ~ group)
-    alpha_tests[[metric]] <- list(statistic = unname(test$statistic), p_value = test$p.value)
+    alpha_tests$tests[[metric]] <- list(statistic = unname(test$statistic), p_value = test$p.value)
   }
 }
 write_json(alpha_tests, file.path(output_dir, "tables", "alpha_tests.json"), pretty = TRUE, auto_unbox = TRUE)
@@ -95,8 +96,8 @@ p_pcoa <- ggplot(pcoa, aes(PCoA1, PCoA2, color = group)) + geom_point(size = 3) 
   labs(color = contract$group_column)
 ggsave(file.path(output_dir, "figures", "pcoa.png"), p_pcoa, width = 7, height = 5.5, dpi = 160)
 
-beta_tests <- list(skipped = TRUE, reason = "At least two groups with two or more samples each are required")
-if (has_replicated_groups) {
+beta_tests <- list(skipped = TRUE, reason = "Overall test disabled when a batch column is supplied")
+if (has_replicated_groups && is.null(contract$batch_column)) {
   metadata_beta <- data.frame(group = group)
   permutations <- as.integer(contract$parameters$permutations)
   permanova <- adonis2(dist_bray ~ group, data = metadata_beta, permutations = permutations)
@@ -109,6 +110,67 @@ if (has_replicated_groups) {
   )
 }
 write_json(beta_tests, file.path(output_dir, "tables", "beta_tests.json"), pretty = TRUE, auto_unbox = TRUE, na = "null")
+
+# Stratified inference prevents experiment-batch effects from being interpreted
+# as biological treatment effects. Numeric gradients are tested as trends.
+stratified_tests <- list(skipped = TRUE, reason = "No batch column supplied")
+if (!is.null(contract$batch_column)) {
+  batch_values <- as.character(metadata[[contract$batch_column]])
+  stratified_tests <- list(skipped = FALSE, batch_column = contract$batch_column, batches = list())
+  for (batch_name in unique(batch_values)) {
+    keep <- which(batch_values == batch_name)
+    batch_samples <- rownames(metadata)[keep]
+    batch_group <- droplevels(group[batch_samples])
+    batch_counts <- sample_counts[batch_samples, , drop = FALSE]
+    batch_alpha <- alpha[match(batch_samples, alpha$sample_id), , drop = FALSE]
+    batch_result <- list(sample_count = length(keep), groups = as.list(table(batch_group)))
+
+    gradient_used <- FALSE
+    if (!is.null(contract$gradient_column)) {
+      gradient <- suppressWarnings(as.numeric(metadata[batch_samples, contract$gradient_column]))
+      if (all(is.finite(gradient)) && length(unique(gradient)) >= 3) {
+        gradient_used <- TRUE
+        alpha_trend <- list()
+        for (metric in c("Observed", "Shannon", "Simpson")) {
+          trend <- cor.test(batch_alpha[[metric]], gradient, method = "spearman", exact = FALSE)
+          alpha_trend[[metric]] <- list(rho = unname(trend$estimate), p_value = trend$p.value)
+        }
+        batch_dist <- vegdist(batch_counts, method = "bray")
+        gradient_data <- data.frame(gradient = gradient)
+        gradient_permanova <- adonis2(batch_dist ~ gradient, data = gradient_data,
+                                      permutations = as.integer(contract$parameters$permutations))
+        batch_result$analysis_type <- "ordered_gradient"
+        batch_result$gradient_levels <- sort(unique(gradient))
+        batch_result$alpha_trend <- alpha_trend
+        batch_result$beta_trend <- list(F = gradient_permanova$F[1], R2 = gradient_permanova$R2[1],
+                                        p_value = gradient_permanova$`Pr(>F)`[1])
+      }
+    }
+
+    if (!gradient_used && nlevels(batch_group) >= 2 && all(table(batch_group) >= 2)) {
+      alpha_group <- list()
+      for (metric in c("Observed", "Shannon", "Simpson")) {
+        test <- kruskal.test(batch_alpha[[metric]] ~ batch_group)
+        alpha_group[[metric]] <- list(statistic = unname(test$statistic), p_value = test$p.value)
+      }
+      batch_dist <- vegdist(batch_counts, method = "bray")
+      group_data <- data.frame(batch_group = batch_group)
+      perm <- adonis2(batch_dist ~ batch_group, data = group_data,
+                      permutations = as.integer(contract$parameters$permutations))
+      disp <- anova(betadisper(batch_dist, batch_group))
+      batch_result$analysis_type <- "categorical_within_batch"
+      batch_result$alpha_group <- alpha_group
+      batch_result$permanova <- list(F = perm$F[1], R2 = perm$R2[1], p_value = perm$`Pr(>F)`[1])
+      batch_result$dispersion <- list(F = disp$`F value`[1], p_value = disp$`Pr(>F)`[1])
+    } else if (!gradient_used) {
+      batch_result$analysis_type <- "descriptive_only"
+      batch_result$reason <- "At least two replicated groups are required"
+    }
+    stratified_tests$batches[[batch_name]] <- batch_result
+  }
+}
+write_json(stratified_tests, file.path(output_dir, "tables", "stratified_tests.json"),
+           pretty = TRUE, auto_unbox = TRUE, na = "null")
 
 rank_name <- as.character(contract$parameters$taxonomy_rank)
 taxa <- as.character(taxonomy[[rank_name]])
@@ -138,7 +200,8 @@ checks <- list(
   finite_alpha = all(is.finite(as.matrix(alpha[, c("Observed", "Shannon", "Simpson")]))),
   finite_pcoa = all(is.finite(as.matrix(pcoa[, c("PCoA1", "PCoA2")]))),
   composition_sums_to_one = all(abs(colSums(relative) - 1) < 1e-8),
-  permanova_has_dispersion_test = isTRUE(beta_tests$skipped) || !is.null(beta_tests$dispersion)
+  permanova_has_dispersion_test = isTRUE(beta_tests$skipped) || !is.null(beta_tests$dispersion),
+  stratified_tests_present = is.null(contract$batch_column) || !isTRUE(stratified_tests$skipped)
 )
 validation <- list(status = if (all(unlist(checks))) "pass" else "fail", checks = checks,
                    cautions = c("PERMANOVA must be interpreted together with dispersion testing.",
