@@ -1,0 +1,14 @@
+FeatureID,Kingdom,Phylum,Class,Order,Family,Genus,Species
+ASV1,Bacteria,Proteobacteria,Gammaproteobacteria,Pseudomonadales,Pseudomonadaceae,Pseudomonas,sp1
+ASV2,Bacteria,Proteobacteria,Alphaproteobacteria,Rhizobiales,Rhizobiaceae,Rhizobium,sp2
+ASV3,Bacteria,Actinobacteriota,Actinobacteria,Micrococcales,Micrococcaceae,Arthrobacter,sp3
+ASV4,Bacteria,Firmicutes,Bacilli,Bacillales,Bacillaceae,Bacillus,sp4
+ASV5,Bacteria,Bacteroidota,Bacteroidia,Flavobacteriales,Flavobacteriaceae,Flavobacterium,sp5
+ASV6,Bacteria,Proteobacteria,Gammaproteobacteria,Enterobacterales,Enterobacteriaceae,Enterobacter,sp6
+ASV7,Bacteria,Firmicutes,Bacilli,Lactobacillales,Streptococcaceae,Streptococcus,sp7
+ASV8,Bacteria,Acidobacteriota,Acidobacteriae,Acidobacteriales,Acidobacteriaceae,Acidobacterium,sp8
+ASV9,Bacteria,Planctomycetota,Planctomycetes,Planctomycetales,Planctomycetaceae,Planctomyces,sp9
+ASV10,Bacteria,Verrucomicrobiota,Verrucomicrobiae,Verrucomicrobiales,Verrucomicrobiaceae,Akkermansia,sp10
+ASV11,Bacteria,Chloroflexota,Anaerolineae,Anaerolineales,Anaerolineaceae,Anaerolinea,sp11
+ASV12,Bacteria,Myxococcota,Polyangia,Myxococcales,Myxococcaceae,Myxococcus,sp12
+

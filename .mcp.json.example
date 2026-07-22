@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "amplicon-analysis": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "-v", "${PWD}:/workspace",
+        "-e", "AMPLICON_WORKSPACE=/workspace",
+        "amplicon-analysis-agent:0.1.0"
+      ]
+    }
+  }
+}
+
