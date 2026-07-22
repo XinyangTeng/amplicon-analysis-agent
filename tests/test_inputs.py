@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from amplicon_agent.inputs import inspect_inputs
+from amplicon_agent.module_registry import get_module, list_modules
 
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo"
@@ -56,3 +57,10 @@ def test_batch_and_ordered_gradient_design_is_summarized(monkeypatch, tmp_path):
     assert result.status == "warning"
     assert set(result.design_summary["batches"]) == {"categorical", "gradient"}
     assert result.design_summary["batches"]["gradient"]["gradient_levels"] == [1.0, 2.0, 3.0]
+
+
+def test_all_team_modules_are_registered_with_compatibility_status():
+    modules = list_modules()
+    assert len(modules) == 55
+    assert get_module("script-alpha")["status"] == "verified"
+    assert get_module("script-barplot")["status"] == "blocked"

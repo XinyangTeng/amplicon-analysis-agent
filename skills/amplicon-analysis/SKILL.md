@@ -21,6 +21,10 @@ Use this skill for downstream ASV/OTU analyses with an abundance table, taxonomy
 10. Separate facts, statistical results, interpretations, and hypotheses. Never turn association into causality.
 11. Interpret categorical PERMANOVA only together with the dispersion test. Treat ordered gradients as trends, not independent categories.
 
+## EMO modules
+
+Call `list_amplicon_analysis_modules` and read [references/modules.md](references/modules.md) before selecting a team EMO module. Include only `verified` modules in a production plan. Test `registered_untested` modules on demo data first. Never select a `blocked` module.
+
 ## Safety
 
 - Never access files outside `AMPLICON_WORKSPACE`.

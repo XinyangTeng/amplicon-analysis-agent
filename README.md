@@ -13,6 +13,8 @@
 - 无有效重复时自动跳过不适用的显著性检验。
 - 支持按 `batch_column` 分层推断，避免实验批次与处理效应混杂；
 - 支持通过 `gradient_column` 分析连续增强的胁迫梯度。
+- 注册团队提供的55个 EMO 分析模块，并记录 `verified`、`registered_untested`、`blocked` 兼容状态；
+- EMO 模块在批次隔离的 phyloseq 工作区执行，输出独立日志和清单。
 
 ## 本地运行
 
@@ -62,6 +64,8 @@ claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e
 ## MCP 工具
 
 `inspect_amplicon_inputs`、`prepare_amplicon_analysis`、`approve_analysis`、`run_amplicon_analysis`、`get_run_status`、`validate_amplicon_results`、`get_analysis_report`。
+
+扩展能力查询工具：`list_amplicon_analysis_modules`、`inspect_amplicon_module`。
 
 多实验数据应在检查和计划工具中同时传入 `batch_column`。剂量、时间或胁迫强度为有序数值时传入 `gradient_column`。此时分类实验在批次内部运行 Kruskal–Wallis、PERMANOVA 与离散度检验；完整数值梯度运行 Spearman Alpha 趋势和连续变量 PERMANOVA。Agent 不执行跨批次的总体显著性检验。
 

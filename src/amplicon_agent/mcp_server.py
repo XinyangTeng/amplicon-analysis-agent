@@ -3,6 +3,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from .service import AgentService
+from .module_registry import get_module, list_modules
 
 
 mcp = FastMCP(
@@ -13,6 +14,19 @@ mcp = FastMCP(
     ),
 )
 service = AgentService()
+
+
+@mcp.tool()
+def list_amplicon_analysis_modules(category: str | None = None) -> dict:
+    """List all registered team EMO analysis modules, optionally filtered by category."""
+    modules = list_modules(category)
+    return {"count": len(modules), "modules": modules}
+
+
+@mcp.tool()
+def inspect_amplicon_module(module_id: str) -> dict:
+    """Return provenance and declared package requirements for one EMO module."""
+    return get_module(module_id)
 
 
 @mcp.tool()

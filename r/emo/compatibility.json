@@ -1,0 +1,27 @@
+{
+  "script-alpha": {
+    "status": "verified",
+    "tested_on": "2026-07-22",
+    "notes": "Completed on demo data and all three real-data experiment batches."
+  },
+  "ordinate-micro": {
+    "status": "verified",
+    "tested_on": "2026-07-22",
+    "notes": "Completed on demo data and all three real-data experiment batches."
+  },
+  "script-rarefaction": {
+    "status": "verified",
+    "tested_on": "2026-07-22",
+    "notes": "Completed on demo data and all three real-data experiment batches."
+  },
+  "script-microtest": {
+    "status": "verified",
+    "tested_on": "2026-07-22",
+    "notes": "Completed on demo data and all three real-data experiment batches."
+  },
+  "script-barplot": {
+    "status": "blocked",
+    "tested_on": "2026-07-22",
+    "notes": "EasyMultiOmics::barMainplot.micro is incompatible with the installed dplyr summarise semantics; use the baseline composition module until ported."
+  }
+}

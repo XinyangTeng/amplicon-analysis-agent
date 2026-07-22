@@ -44,7 +44,7 @@ class AnalysisContract(BaseModel):
     gradient_column: str | None = None
     orientation: str
     transpose_abundance: bool
-    modules: list[Literal["qc", "alpha", "beta", "composition"]]
+    modules: list[str]
     parameters: dict[str, object]
     warnings: list[str]
     blockers: list[str]

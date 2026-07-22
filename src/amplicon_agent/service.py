@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import subprocess
 import uuid
 from pathlib import Path
 
+import pandas as pd
+
 from .inputs import inspect_inputs
 from .models import AnalysisContract, ApprovalResult, RunResult
 from .security import secure_path, sha256_file, token_hash, workspace_root
 from .store import PlanStore
+from .module_registry import get_module, module_registry, SCRIPT_ROOT
 
 
 EXPECTED_OUTPUTS = [
@@ -34,11 +38,20 @@ class AgentService:
                 batch_column: str | None = None, gradient_column: str | None = None) -> dict:
         inspection = inspect_inputs(abundance, taxonomy, metadata, group_column, batch_column, gradient_column)
         selected_modules = modules or ["qc", "alpha", "beta", "composition"]
-        allowed = {"qc", "alpha", "beta", "composition"}
-        invalid = sorted(set(selected_modules) - allowed)
+        baseline_modules = {"qc", "alpha", "beta", "composition"}
+        registered_emo = {f"emo:{name}" for name in module_registry()}
+        invalid = sorted(set(selected_modules) - baseline_modules - registered_emo)
         blockers = list(inspection.blockers)
         if invalid:
             blockers.append(f"Unsupported modules: {invalid}")
+        for selected in selected_modules:
+            if not selected.startswith("emo:"):
+                continue
+            module = get_module(selected.removeprefix("emo:"))
+            if module["status"] == "blocked":
+                blockers.append(f"EMO module {selected} is blocked: {module.get('notes', 'compatibility failure')}")
+            elif module["status"] == "registered_untested":
+                inspection.warnings.append(f"EMO module {selected} is registered but has not passed compatibility testing")
         if not 9 <= permutations <= 9999:
             blockers.append("permutations must be between 9 and 9999")
         if not 1 <= top_n <= 50:
@@ -62,7 +75,7 @@ class AgentService:
             },
             warnings=inspection.warnings,
             blockers=blockers,
-            expected_outputs=EXPECTED_OUTPUTS,
+            expected_outputs=EXPECTED_OUTPUTS + (["emo/emo_manifest.json"] if any(x.startswith("emo:") for x in selected_modules) else []),
         )
         self.store.save(contract)
         return contract.model_dump()
@@ -106,10 +119,14 @@ class AgentService:
         log_path = log_dir / "r-analysis.log"
         command = [rscript, str(script), str(run_dir / "analysis_contract.json"), str(run_dir)]
         try:
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=1800, check=False)
+            completed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8",
+                                       errors="replace", timeout=1800, check=False)
             log_path.write_text(completed.stdout + "\n--- STDERR ---\n" + completed.stderr, encoding="utf-8")
             if completed.returncode != 0:
                 raise RuntimeError(f"R analysis failed with exit code {completed.returncode}")
+            emo_modules = [item.removeprefix("emo:") for item in contract.modules if item.startswith("emo:")]
+            if emo_modules:
+                self._run_emo_modules(contract, run_dir, emo_modules, rscript)
             contract.status = "succeeded"
             self.store.save(contract)
             return RunResult(
@@ -149,3 +166,98 @@ class AgentService:
             path = secure_path(path_value)
             if sha256_file(path) != contract.file_hashes[name]:
                 raise ValueError(f"Input changed after plan creation: {name}")
+
+    @staticmethod
+    def _run_emo_modules(contract: AnalysisContract, run_dir: Path,
+                         module_ids: list[str], rscript: str) -> None:
+        emo_root = run_dir / "emo"
+        logs = emo_root / "logs"
+        logs.mkdir(parents=True, exist_ok=True)
+        params = dict(contract.parameters)
+        params.update({
+            "group_col": contract.group_column,
+            "group_column": contract.group_column,
+            "batch_column": contract.batch_column,
+            "gradient_column": contract.gradient_column,
+            "plot_dpi": 160,
+        })
+        metadata = pd.read_csv(contract.files.metadata, sep=None, engine="python", encoding="utf-8-sig")
+        metadata[metadata.columns[0]] = metadata.iloc[:, 0].astype(str)
+        if contract.batch_column:
+            contexts = [(str(batch), frame.copy()) for batch, frame in metadata.groupby(contract.batch_column)]
+        else:
+            contexts = [("all_samples", metadata)]
+        abundance = pd.read_csv(contract.files.abundance, sep=None, engine="python", encoding="utf-8-sig")
+        abundance.iloc[:, 0] = abundance.iloc[:, 0].astype(str)
+        if contract.transpose_abundance:
+            abundance = abundance.set_index(abundance.columns[0]).T.reset_index()
+            abundance.columns = ["FeatureID", *abundance.columns[1:]]
+        taxonomy = pd.read_csv(contract.files.taxonomy, sep=None, engine="python", encoding="utf-8-sig")
+
+        workspaces: list[tuple[str, Path]] = []
+        for context_name, context_meta in contexts:
+            safe_context = re.sub(r"[^A-Za-z0-9._-]+", "_", context_name)
+            workspace = emo_root / "batches" / safe_context
+            workspace.mkdir(parents=True, exist_ok=True)
+            source_sample_ids = context_meta.iloc[:, 0].astype(str).tolist()
+            if "sample_name" in context_meta.columns:
+                output_sample_ids = context_meta["sample_name"].astype(str).tolist()
+            else:
+                output_sample_ids = source_sample_ids
+            missing = sorted(set(source_sample_ids) - set(map(str, abundance.columns[1:])))
+            if missing:
+                raise RuntimeError(f"Cannot create EMO batch workspace; missing samples: {missing}")
+            context_abundance = abundance.loc[:, [abundance.columns[0], *source_sample_ids]].copy()
+            context_abundance.columns = [context_abundance.columns[0], *output_sample_ids]
+            context_abundance.to_csv(workspace / "otutab.txt", sep="\t", index=False)
+            taxonomy.to_csv(workspace / "taxonomy.txt", sep="\t", index=False)
+            context_meta = context_meta.copy()
+            context_meta.insert(1, "source_sample_id", source_sample_ids)
+            context_meta[context_meta.columns[0]] = output_sample_ids
+            if "sample_name" in context_meta.columns:
+                context_meta = context_meta.drop(columns=["sample_name"])
+            context_meta.to_csv(workspace / "metadata.tsv", sep="\t", index=False)
+            (workspace / "params.json").write_text(
+                json.dumps(params, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            workspaces.append((safe_context, workspace))
+
+        manifest: dict[str, object] = {"modules": {}, "contexts": [x[0] for x in workspaces], "status": "running"}
+        env = os.environ.copy()
+        env["SCRIPT_DIR"] = str(SCRIPT_ROOT)
+        for module_id in module_ids:
+            module = get_module(module_id)
+            script = SCRIPT_ROOT / str(module["script"])
+            module_runs: dict[str, object] = {}
+            for context_name, workspace in workspaces:
+                completed = subprocess.run(
+                    [rscript, str(script)], cwd=workspace, env=env,
+                    capture_output=True, text=True, encoding="utf-8", errors="replace",
+                    timeout=1800, check=False,
+                )
+                log_name = f"{module_id}--{context_name}.log"
+                (logs / log_name).write_text(
+                    completed.stdout + "\n--- STDERR ---\n" + completed.stderr, encoding="utf-8"
+                )
+                module_runs[context_name] = {
+                    "return_code": completed.returncode,
+                    "status": "succeeded" if completed.returncode == 0 else "failed",
+                    "log": f"logs/{log_name}",
+                }
+                if completed.returncode != 0:
+                    manifest["modules"][module_id] = {
+                        "script": module["script"], "category": module["category"], "runs": module_runs
+                    }
+                    manifest["status"] = "failed"
+                    (emo_root / "emo_manifest.json").write_text(
+                        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+                    )
+                    raise RuntimeError(f"EMO module failed: {module_id} ({context_name})")
+            manifest["modules"][module_id] = {
+                "script": module["script"], "category": module["category"], "runs": module_runs
+            }
+        manifest["status"] = "succeeded"
+        manifest["files"] = [str(path.relative_to(emo_root)) for path in emo_root.rglob("*") if path.is_file()]
+        (emo_root / "emo_manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
