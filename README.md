@@ -15,6 +15,8 @@
 - 支持通过 `gradient_column` 分析连续增强的胁迫梯度。
 - 注册团队提供的55个 EMO 分析模块，并记录 `verified`、`registered_untested`、`blocked` 兼容状态；
 - EMO 模块在批次隔离的 phyloseq 工作区执行，输出独立日志和清单。
+- 支持可选系统发育树、代表序列和模块专属参数，全部纳入文件哈希与审批失效机制；
+- 模块执行前按批次检查样本量、分组数、树、KO及source/sink等前置条件。
 
 ## 本地运行
 
@@ -66,6 +68,10 @@ claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e
 `inspect_amplicon_inputs`、`prepare_amplicon_analysis`、`approve_analysis`、`run_amplicon_analysis`、`get_run_status`、`validate_amplicon_results`、`get_analysis_report`。
 
 扩展能力查询工具：`list_amplicon_analysis_modules`、`inspect_amplicon_module`。
+
+完整的55模块能力、状态、参数和前置条件见 [`docs/MODULE_CATALOG.md`](docs/MODULE_CATALOG.md)。
+
+模块兼容状态来自自动冒烟测试：32个已验证、23个条件可用、无未处理阻断模块。条件模块只有在输入和样本量要求满足时才执行；不适用批次会写入 `skipped` 和明确原因，不会伪造结果。旧 DESeq2 和组成图函数的版本冲突已有原生回退实现。
 
 多实验数据应在检查和计划工具中同时传入 `batch_column`。剂量、时间或胁迫强度为有序数值时传入 `gradient_column`。此时分类实验在批次内部运行 Kruskal–Wallis、PERMANOVA 与离散度检验；完整数值梯度运行 Spearman Alpha 趋势和连续变量 PERMANOVA。Agent 不执行跨批次的总体显著性检验。
 

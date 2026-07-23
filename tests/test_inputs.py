@@ -63,4 +63,7 @@ def test_all_team_modules_are_registered_with_compatibility_status():
     modules = list_modules()
     assert len(modules) == 55
     assert get_module("script-alpha")["status"] == "verified"
-    assert get_module("script-barplot")["status"] == "blocked"
+    assert get_module("script-barplot")["status"] == "verified"
+    assert get_module("script-alpha-pd")["status"] == "conditional"
+    assert get_module("script-alpha-pd")["specification"]["requires_tree"] is True
+    assert any(item["name"] == "permutations" for item in get_module("script-bnti")["declared_parameters"])

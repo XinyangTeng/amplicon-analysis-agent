@@ -14,6 +14,8 @@ class InputFiles(BaseModel):
     abundance: str
     taxonomy: str
     metadata: str
+    tree: str | None = None
+    representative_sequences: str | None = None
 
 
 class InspectionResult(BaseModel):
@@ -26,6 +28,7 @@ class InspectionResult(BaseModel):
     feature_count: int = 0
     groups: dict[str, int] = Field(default_factory=dict)
     taxonomy_ranks: list[str] = Field(default_factory=list)
+    taxonomy_columns: list[str] = Field(default_factory=list)
     selected_taxonomy_rank: str | None = None
     warnings: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
@@ -34,7 +37,7 @@ class InspectionResult(BaseModel):
 
 
 class AnalysisContract(BaseModel):
-    schema_version: str = "1.1"
+    schema_version: str = "1.2"
     plan_id: str
     created_at: str = Field(default_factory=utc_now)
     files: InputFiles

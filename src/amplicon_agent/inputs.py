@@ -172,6 +172,7 @@ def inspect_inputs(abundance: str, taxonomy: str, metadata: str, group_column: s
         feature_count=feature_count,
         groups=groups,
         taxonomy_ranks=ranks,
+        taxonomy_columns=[str(column) for column in tax.columns],
         selected_taxonomy_rank=selected_rank,
         warnings=warnings,
         blockers=blockers,

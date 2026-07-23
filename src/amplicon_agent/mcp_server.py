@@ -41,10 +41,13 @@ def inspect_amplicon_inputs(abundance: str, taxonomy: str, metadata: str, group_
 def prepare_amplicon_analysis(abundance: str, taxonomy: str, metadata: str, group_column: str,
                                modules: list[str] | None = None, permutations: int = 999,
                                top_n: int = 10, batch_column: str | None = None,
-                               gradient_column: str | None = None) -> dict:
+                               gradient_column: str | None = None, tree: str | None = None,
+                               representative_sequences: str | None = None,
+                               module_parameters: dict[str, object] | None = None) -> dict:
     """Create an immutable analysis contract. This does not execute analysis."""
     return service.prepare(abundance, taxonomy, metadata, group_column, modules, permutations, top_n,
-                           batch_column, gradient_column)
+                           batch_column, gradient_column, tree, representative_sequences,
+                           module_parameters)
 
 
 @mcp.tool()

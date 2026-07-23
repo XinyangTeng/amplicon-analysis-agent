@@ -4,6 +4,8 @@ import re
 import json
 from pathlib import Path
 
+from .module_specs import specification
+
 
 SCRIPT_ROOT = Path(__file__).resolve().parents[2] / "r" / "emo"
 
@@ -29,6 +31,14 @@ def _packages(text: str) -> list[str]:
     return sorted(set(re.findall(r"(?:library|require)\s*\(\s*([A-Za-z][A-Za-z0-9._]*)", text)))
 
 
+def _parameters(text: str) -> list[dict[str, str]]:
+    type_map = {"chr": "string", "num": "number", "int": "integer", "bool": "boolean", "vec": "array[string]"}
+    found: dict[str, str] = {}
+    for kind, name in re.findall(r'param_(chr|num|int|bool|vec)\s*\(\s*params\s*,\s*"([^"]+)"', text):
+        found[name] = type_map[kind]
+    return [{"name": name, "type": found[name]} for name in sorted(found)]
+
+
 def module_registry() -> dict[str, dict[str, object]]:
     compatibility_path = SCRIPT_ROOT / "compatibility.json"
     compatibility = json.loads(compatibility_path.read_text(encoding="utf-8")) if compatibility_path.exists() else {}
@@ -43,9 +53,11 @@ def module_registry() -> dict[str, dict[str, object]]:
             "script": path.name,
             "category": _category(path.name),
             "packages": _packages(text),
+            "declared_parameters": _parameters(text),
             "uses_common_adapter": "amp_common.R" in text,
             "status": "registered_untested",
             "source": "team-authorized EasyMultiOmics R snapshot",
+            "specification": specification(module_id, _category(path.name)),
         }
         registry[module_id].update(compatibility.get(module_id, {}))
     return registry
