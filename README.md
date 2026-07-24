@@ -17,6 +17,20 @@
 - EMO 模块在批次隔离的 phyloseq 工作区执行，输出独立日志和清单。
 - 支持可选系统发育树、代表序列和模块专属参数，全部纳入文件哈希与审批失效机制；
 - 模块执行前按批次检查样本量、分组数、树、KO及source/sink等前置条件。
+- 全部模块完成后，确定性脚本自动扫描运行目录，把所有图件按批次/结果类型导入统一 HTML；
+- 自动生成 `report_data.json` 供大模型在校验通过后解读，并生成带文件哈希的 `artifact_manifest.json`。
+
+## 分层架构
+
+`专家 Skill → MCP 编排与审批 → R/EMO 确定性计算 → 确定性校验与报告汇总 → 大模型解读`
+
+- 专家 Skill 解析生物学问题和实验设计、整理输入、选择合适分析并设定解释边界；
+- MCP Server 负责工具 Schema、路径安全、输入哈希、分析合同、一次性审批和执行状态；
+- R 与团队 EMO 函数只负责统计计算和原始图表；
+- 报告脚本递归扫描结果文件夹，自动生成 HTML、机器可读摘要和完整产物清单；
+- 大模型只在校验通过后读取结构化摘要，负责解释，不负责计算、找文件或拼报告。
+
+详细设计见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 
 ## 本地运行
 
@@ -65,7 +79,7 @@ claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e
 
 ## MCP 工具
 
-`inspect_amplicon_inputs`、`prepare_amplicon_analysis`、`approve_analysis`、`run_amplicon_analysis`、`get_run_status`、`validate_amplicon_results`、`get_analysis_report`。
+`inspect_amplicon_inputs`、`prepare_amplicon_analysis`、`approve_analysis`、`run_amplicon_analysis`、`get_run_status`、`validate_amplicon_results`、`get_analysis_report`、`get_report_context`。
 
 扩展能力查询工具：`list_amplicon_analysis_modules`、`inspect_amplicon_module`。
 
