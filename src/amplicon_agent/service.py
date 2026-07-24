@@ -17,14 +17,26 @@ from .security import secure_path, sha256_file, token_hash, workspace_root
 from .store import PlanStore
 from .module_registry import get_module, module_registry, SCRIPT_ROOT
 from .module_specs import assess_context
+from .report_builder import build_analysis_report
 
 
 EXPECTED_OUTPUTS = [
     "analysis_contract.json", "run_manifest.json", "validation.json", "report.html",
+    "report_data.json", "artifact_manifest.json",
     "tables/qc_summary.csv", "tables/alpha_diversity.csv", "tables/pcoa_coordinates.csv",
     "tables/composition_relative_abundance.csv", "figures/alpha_diversity.png",
     "tables/stratified_tests.json", "figures/pcoa.png", "figures/composition.png", "logs/r-analysis.log",
 ]
+
+
+def r_subprocess_environment() -> dict[str, str]:
+    """Return an R environment that does not pass POSIX-only locales on Windows."""
+    env = os.environ.copy()
+    if os.name == "nt":
+        for name in list(env):
+            if name == "LANG" or name.startswith("LC_"):
+                env.pop(name, None)
+    return env
 
 
 class AgentService:
@@ -146,8 +158,11 @@ class AgentService:
         log_path = log_dir / "r-analysis.log"
         command = [rscript, str(script), str(run_dir / "analysis_contract.json"), str(run_dir)]
         try:
-            completed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8",
-                                       errors="replace", timeout=1800, check=False)
+            completed = subprocess.run(
+                command, capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=1800, check=False,
+                env=r_subprocess_environment(),
+            )
             log_path.write_text(completed.stdout + "\n--- STDERR ---\n" + completed.stderr, encoding="utf-8")
             if completed.returncode != 0:
                 raise RuntimeError(f"R analysis failed with exit code {completed.returncode}")
@@ -155,6 +170,10 @@ class AgentService:
             if emo_modules:
                 self._run_emo_modules(contract, run_dir, emo_modules, rscript)
             contract.status = "succeeded"
+            (run_dir / "analysis_contract.json").write_text(
+                contract.model_dump_json(indent=2), encoding="utf-8"
+            )
+            build_analysis_report(run_dir)
             self.store.save(contract)
             return RunResult(
                 plan_id=plan_id, status="succeeded", run_directory=str(run_dir),
@@ -163,6 +182,9 @@ class AgentService:
         except Exception as exc:
             contract.status = "failed"
             contract.error = str(exc)
+            (run_dir / "analysis_contract.json").write_text(
+                contract.model_dump_json(indent=2), encoding="utf-8"
+            )
             self.store.save(contract)
             return RunResult(plan_id=plan_id, status="failed", run_directory=str(run_dir), error=str(exc))
 
@@ -185,7 +207,26 @@ class AgentService:
         if not contract.run_directory:
             raise ValueError("Plan has not been run")
         report = secure_path(Path(contract.run_directory) / "report.html")
-        return {"plan_id": plan_id, "report_path": str(report), "report_uri": report.as_uri()}
+        report_data = secure_path(Path(contract.run_directory) / "report_data.json")
+        artifact_manifest = secure_path(Path(contract.run_directory) / "artifact_manifest.json")
+        return {
+            "plan_id": plan_id,
+            "report_path": str(report),
+            "report_uri": report.as_uri(),
+            "report_data_path": str(report_data),
+            "artifact_manifest_path": str(artifact_manifest),
+        }
+
+    def report_context(self, plan_id: str) -> dict:
+        """Return validated, structured results for language-model interpretation."""
+        validation = self.validate(plan_id)
+        if validation["status"] != "pass":
+            raise ValueError("Results must pass validation before interpretation")
+        contract = self.store.load(plan_id)
+        if not contract.run_directory:
+            raise ValueError("Plan has not been run")
+        report_data_path = secure_path(Path(contract.run_directory) / "report_data.json")
+        return json.loads(report_data_path.read_text(encoding="utf-8"))
 
     @staticmethod
     def _verify_hashes(contract: AnalysisContract) -> None:
@@ -259,7 +300,7 @@ class AgentService:
 
         manifest: dict[str, object] = {"modules": {}, "contexts": [x[0] for x in workspaces], "status": "running"}
         failures: list[str] = []
-        env = os.environ.copy()
+        env = r_subprocess_environment()
         env["SCRIPT_DIR"] = str(SCRIPT_ROOT)
         for module_id in module_ids:
             module = get_module(module_id)

@@ -216,28 +216,3 @@ manifest <- list(
   files = list.files(output_dir, recursive = TRUE)
 )
 write_json(manifest, file.path(output_dir, "run_manifest.json"), pretty = TRUE, auto_unbox = TRUE)
-
-esc <- function(x) gsub("&", "&amp;", gsub("<", "&lt;", gsub(">", "&gt;", as.character(x))))
-warning_html <- if (length(contract$warnings)) paste0("<li>", esc(contract$warnings), "</li>", collapse = "") else "<li>None</li>"
-beta_summary <- if (isTRUE(beta_tests$skipped)) esc(beta_tests$reason) else sprintf("PERMANOVA R²=%.3f, p=%.4g; dispersion p=%.4g", beta_tests$permanova$R2, beta_tests$permanova$p_value, beta_tests$dispersion$p_value)
-html <- paste0(
-  "<!doctype html><html><head><meta charset='utf-8'><title>Amplicon analysis report</title>",
-  "<style>body{font-family:Arial,'Microsoft YaHei',sans-serif;max-width:1000px;margin:40px auto;line-height:1.6;color:#18352a}h1,h2{color:#075f35}img{max-width:100%;border:1px solid #ddd}code{background:#eef5f0;padding:2px 5px}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px}</style></head><body>",
-  "<h1>扩增子微生物组分析报告</h1><p><b>Plan ID:</b> <code>", esc(contract$plan_id), "</code></p>",
-  "<h2>数据概况</h2><p>", nrow(sample_counts), " 个样本，", ncol(sample_counts), " 个特征；分组列：", esc(contract$group_column), "。</p>",
-  "<h2>输入警告</h2><ul>", warning_html, "</ul>",
-  "<h2>方法与参数</h2><p>Alpha: Observed/Shannon/Simpson；Beta: Bray-Curtis + PCoA + PERMANOVA + dispersion；组成层级：", esc(rank_name), "。</p>",
-  "<h2>QC 与 Alpha 多样性</h2><img src='figures/alpha_diversity.png'><p>详细数值见 <code>tables/alpha_diversity.csv</code>。</p>",
-  "<h2>Beta 多样性</h2><img src='figures/pcoa.png'><p>", beta_summary, "</p>",
-  "<h2>群落组成</h2><img src='figures/composition.png'><p>显示平均丰度最高的 ", top_n, " 个分类单元，其余合并为 Other。</p>",
-  "<h2>合理性检查</h2><p>状态：<b>", validation$status, "</b>。结果必须结合实验设计、样本量和离散度检验解释。</p>",
-  "<h2>结论边界</h2><ul><li>可以报告描述统计、组间差异及其不确定性。</li><li>不能由本分析直接推断因果关系或机制。</li><li>显著性结果不能替代效应量和数据质量判断。</li></ul>",
-  "<h2>文件索引</h2><p>机器可读清单见 <code>run_manifest.json</code>，校验结果见 <code>validation.json</code>。</p></body></html>"
-)
-writeLines(html, file.path(output_dir, "report.html"), useBytes = TRUE)
-
-# Keep report rendering isolated from the analysis code so it can later be
-# replaced by a Quarto/R Markdown template without changing statistics.
-script_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1]
-script_dir <- dirname(normalizePath(sub("^--file=", "", script_arg), mustWork = TRUE))
-source(file.path(script_dir, "write_report.R"))

@@ -10,7 +10,9 @@ mcp = FastMCP(
     "Amplicon Analysis Agent",
     instructions=(
         "Inspect inputs before preparing a plan. Never run a plan before the user explicitly approves it. "
-        "Explain blockers, warnings, statistical limits, and the evidence supporting every conclusion."
+        "Explain blockers, warnings, statistical limits, and the evidence supporting every conclusion. "
+        "After execution, validate first and use get_report_context for interpretation; numerical analysis "
+        "and report assembly are deterministic executor responsibilities, not language-model tasks."
     ),
 )
 service = AgentService()
@@ -78,6 +80,12 @@ def validate_amplicon_results(plan_id: str) -> dict:
 def get_analysis_report(plan_id: str) -> dict:
     """Return the local HTML report path for a completed plan."""
     return service.report(plan_id)
+
+
+@mcp.tool()
+def get_report_context(plan_id: str) -> dict:
+    """Return validated structured results for LLM interpretation; never use this to run analysis."""
+    return service.report_context(plan_id)
 
 
 def main() -> None:
