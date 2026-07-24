@@ -1,10 +1,10 @@
 #!/usr/bin/env Rscript
 
 # Refactored for the Amplicon Analysis Agent prototype.
-# Source inspiration: EasyMultiOmics/pipeline/1.pipeline.amp.pro.R
-# Original authors listed by EasyMultiOmics: WenTao, XiePenghao.
+# Refactored from a team-authorized exploratory amplicon workflow.
+# Contributing authors recorded by the team: WenTao, XiePenghao.
 # Changes: removed interactive state and hard-coded paths; reduced the workflow to
-# deterministic QC, alpha, beta, and composition modules with explicit artifacts.
+# deterministic QC, alpha, beta, and composition functions with explicit artifacts.
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) != 2) stop("Usage: run_analysis.R CONTRACT_JSON OUTPUT_DIR")

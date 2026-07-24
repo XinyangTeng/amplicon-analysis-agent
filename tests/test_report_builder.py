@@ -16,10 +16,10 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
 
 
-def test_report_builder_scans_new_module_outputs(tmp_path):
+def test_report_builder_scans_new_function_outputs(tmp_path):
     run_dir = tmp_path / "run"
     (run_dir / "tables").mkdir(parents=True)
-    figure_dir = run_dir / "emo" / "batches" / "drought" / "05_network"
+    figure_dir = run_dir / "functions" / "batches" / "drought" / "05_network"
     figure_dir.mkdir(parents=True)
     (figure_dir / "network_plot.png").write_bytes(ONE_PIXEL_PNG)
     (figure_dir / "network_nodes.csv").write_text("id,degree\nA,2\n", encoding="utf-8")
@@ -39,7 +39,7 @@ def test_report_builder_scans_new_module_outputs(tmp_path):
             "group_column": "Group",
             "batch_column": "Batch",
             "gradient_column": None,
-            "modules": ["qc", "emo:script-network"],
+            "functions": ["qc", "script-network"],
             "parameters": {"seed": 1},
             "warnings": [],
             "blockers": [],
@@ -54,11 +54,11 @@ def test_report_builder_scans_new_module_outputs(tmp_path):
         {"skipped": True, "reason": "demo"},
     )
     write_json(
-        run_dir / "emo" / "emo_manifest.json",
+        run_dir / "functions" / "function_manifest.json",
         {
             "status": "succeeded",
             "contexts": ["drought"],
-            "modules": {
+            "functions": {
                 "script-network": {
                     "script": "script_network.R",
                     "category": "network",
@@ -72,7 +72,7 @@ def test_report_builder_scans_new_module_outputs(tmp_path):
 
     assert result["figure_count"] == 1
     html = (run_dir / "report.html").read_text(encoding="utf-8")
-    assert "emo/batches/drought/05_network/network_plot.png" in html
+    assert "functions/batches/drought/05_network/network_plot.png" in html
     assert "drought · 网络分析" in html
     data = json.loads((run_dir / "report_data.json").read_text(encoding="utf-8"))
     assert data["generator"]["llm_generated"] is False

@@ -64,7 +64,7 @@ def _artifact_kind(path: Path) -> str:
 
 def _artifact_context(relative: Path) -> tuple[str, str]:
     parts = relative.parts
-    if len(parts) >= 4 and parts[0] == "emo" and parts[1] == "batches":
+    if len(parts) >= 4 and parts[0] == "functions" and parts[1] == "batches":
         context = parts[2]
         section = SECTION_LABELS.get(parts[3], parts[3].replace("_", " "))
         return context, section
@@ -72,8 +72,8 @@ def _artifact_context(relative: Path) -> tuple[str, str]:
         return "all_samples", SECTION_LABELS["figures"]
     if parts and parts[0] == "tables":
         return "all_samples", "基础结果表"
-    if len(parts) >= 2 and parts[0] == "emo" and parts[1] == "logs":
-        return "module_logs", "模块日志"
+    if len(parts) >= 2 and parts[0] == "functions" and parts[1] == "logs":
+        return "function_logs", "函数日志"
     return "run", "运行与溯源"
 
 
@@ -133,35 +133,35 @@ def _qc_summary(path: Path) -> dict[str, object]:
     }
 
 
-def _module_summary(manifest: object) -> dict[str, object]:
+def _function_summary(manifest: object) -> dict[str, object]:
     if not isinstance(manifest, dict):
-        return {"status": "not_requested", "modules": [], "run_counts": {}}
-    modules: list[dict[str, object]] = []
+        return {"status": "not_requested", "functions": [], "run_counts": {}}
+    functions: list[dict[str, object]] = []
     counts: Counter[str] = Counter()
-    raw_modules = manifest.get("modules", {})
-    if isinstance(raw_modules, dict):
-        for module_id, module in raw_modules.items():
-            if not isinstance(module, dict):
+    raw_functions = manifest.get("functions", {})
+    if isinstance(raw_functions, dict):
+        for function_id, function in raw_functions.items():
+            if not isinstance(function, dict):
                 continue
             run_states: dict[str, str] = {}
-            raw_runs = module.get("runs", {})
+            raw_runs = function.get("runs", {})
             if isinstance(raw_runs, dict):
                 for context, result in raw_runs.items():
                     state = str(result.get("status", "unknown")) if isinstance(result, dict) else "unknown"
                     run_states[str(context)] = state
                     counts[state] += 1
-            modules.append(
+            functions.append(
                 {
-                    "module_id": str(module_id),
-                    "script": module.get("script"),
-                    "category": module.get("category"),
+                    "function_id": str(function_id),
+                    "script": function.get("script"),
+                    "category": function.get("category"),
                     "runs": run_states,
                 }
             )
     return {
         "status": manifest.get("status", "unknown"),
         "contexts": manifest.get("contexts", []),
-        "modules": modules,
+        "functions": functions,
         "run_counts": dict(sorted(counts.items())),
     }
 
@@ -188,7 +188,7 @@ def _contract_summary(contract: object) -> dict[str, object]:
         "group_column": contract.get("group_column"),
         "batch_column": contract.get("batch_column"),
         "gradient_column": contract.get("gradient_column"),
-        "modules": contract.get("modules", []),
+        "functions": contract.get("functions", []),
         "parameters": contract.get("parameters", {}),
         "warnings": contract.get("warnings", []),
         "blockers": contract.get("blockers", []),
@@ -303,25 +303,25 @@ def _stratified_html(results: object) -> str:
     return "".join(cards)
 
 
-def _module_html(summary: dict[str, object]) -> str:
-    modules = summary.get("modules", [])
-    if not isinstance(modules, list) or not modules:
-        return "<p>本次未请求团队扩展模块。</p>"
+def _function_html(summary: dict[str, object]) -> str:
+    functions = summary.get("functions", [])
+    if not isinstance(functions, list) or not functions:
+        return "<p>本次未请求扩展分析函数。</p>"
     rows: list[str] = []
-    for module in modules:
-        if not isinstance(module, dict):
+    for function in functions:
+        if not isinstance(function, dict):
             continue
-        runs = module.get("runs", {})
+        runs = function.get("runs", {})
         run_text = "；".join(f"{name}: {state}" for name, state in runs.items()) if isinstance(runs, dict) else ""
         rows.append(
             "<tr>"
-            f"<td>{html.escape(str(module.get('module_id', '')))}</td>"
-            f"<td>{html.escape(str(module.get('category', '')))}</td>"
+            f"<td>{html.escape(str(function.get('function_id', '')))}</td>"
+            f"<td>{html.escape(str(function.get('category', '')))}</td>"
             f"<td>{html.escape(run_text)}</td>"
             "</tr>"
         )
     return (
-        "<table><thead><tr><th>模块</th><th>类别</th><th>各批次状态</th></tr></thead>"
+        "<table><thead><tr><th>分析函数</th><th>类别</th><th>各批次状态</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table>"
     )
 
@@ -382,14 +382,14 @@ def _render_html(data: dict[str, object]) -> str:
     contract = data["contract"]
     validation = data["validation"]
     qc = data["qc_summary"]
-    module_execution = data["module_execution"]
+    function_execution = data["function_execution"]
     artifacts = data["artifacts"]
     figures = artifacts["figures"]
     all_artifacts = artifacts["files"]
     warnings = contract.get("warnings", []) if isinstance(contract, dict) else []
     warning_html = "".join(f"<li>{html.escape(str(item))}</li>" for item in warnings) or "<li>无</li>"
     plan_id = html.escape(str(contract.get("plan_id", "unknown"))) if isinstance(contract, dict) else "unknown"
-    modules = contract.get("modules", []) if isinstance(contract, dict) else []
+    functions = contract.get("functions", []) if isinstance(contract, dict) else []
     qc_cards = ""
     if isinstance(qc, dict) and qc:
         depth = qc.get("sequencing_depth", {})
@@ -446,7 +446,7 @@ a{{color:#087443}} details{{border-top:1px solid var(--line);padding:10px 0}} su
   <p>分组列：<code>{html.escape(str(contract.get("group_column")))}</code>；
   批次列：<code>{html.escape(str(contract.get("batch_column")))}</code>；
   梯度列：<code>{html.escape(str(contract.get("gradient_column")))}</code>。</p>
-  <p>执行模块：{html.escape("、".join(map(str, modules)))}</p>
+  <p>执行函数：{html.escape("、".join(map(str, functions)))}</p>
   <h3>输入警告</h3><ul>{warning_html}</ul>
 </section>
 <section class="panel"><h2>2. 自动合理性校验</h2>{_validation_html(validation)}</section>
@@ -454,9 +454,9 @@ a{{color:#087443}} details{{border-top:1px solid var(--line);padding:10px 0}} su
   <p>下列数值由统计脚本直接读取并排版，未经过语言模型改写。</p>
   {_stratified_html(data.get("statistical_results", {}).get("stratified_tests", {}))}
 </section>
-<section class="panel"><h2>4. 团队 EMO 模块执行状态</h2>{_module_html(module_execution)}</section>
+<section class="panel"><h2>4. 扩展分析函数执行状态</h2>{_function_html(function_execution)}</section>
 <section class="panel"><h2>5. 全部分析图件</h2>
-  <p>报告生成器递归扫描运行目录并按批次和结果目录自动分组；新增模块图件无需手工修改报告模板。</p>
+  <p>报告生成器递归扫描运行目录并按批次和结果目录自动分组；新增函数图件无需手工修改报告模板。</p>
   {_figures_html(figures)}
 </section>
 <section class="panel"><h2>6. 结论边界</h2>
@@ -488,7 +488,7 @@ def build_analysis_report(run_directory: str | Path) -> dict[str, object]:
     alpha_tests = _load_json(run_dir / "tables" / "alpha_tests.json", {})
     beta_tests = _load_json(run_dir / "tables" / "beta_tests.json", {})
     stratified_tests = _load_json(run_dir / "tables" / "stratified_tests.json", {})
-    emo_manifest = _load_json(run_dir / "emo" / "emo_manifest.json", {})
+    function_manifest = _load_json(run_dir / "functions" / "function_manifest.json", {})
     artifacts = _inventory(run_dir)
     kinds = Counter(str(item["kind"]) for item in artifacts)
     figures = [item for item in artifacts if item["kind"] == "figure"]
@@ -510,7 +510,7 @@ def build_analysis_report(run_directory: str | Path) -> dict[str, object]:
             "beta_tests": beta_tests,
             "stratified_tests": stratified_tests,
         },
-        "module_execution": _module_summary(emo_manifest),
+        "function_execution": _function_summary(function_manifest),
         "artifacts": {
             "counts": dict(sorted(kinds.items())),
             "figures": figures,

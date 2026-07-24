@@ -4,10 +4,10 @@ import re
 import json
 from pathlib import Path
 
-from .module_specs import specification
+from .function_specs import specification
 
 
-SCRIPT_ROOT = Path(__file__).resolve().parents[2] / "r" / "emo"
+FUNCTION_ROOT = Path(__file__).resolve().parents[2] / "r" / "functions"
 
 
 def _category(name: str) -> str:
@@ -39,39 +39,39 @@ def _parameters(text: str) -> list[dict[str, str]]:
     return [{"name": name, "type": found[name]} for name in sorted(found)]
 
 
-def module_registry() -> dict[str, dict[str, object]]:
-    compatibility_path = SCRIPT_ROOT / "compatibility.json"
+def function_registry() -> dict[str, dict[str, object]]:
+    compatibility_path = FUNCTION_ROOT / "compatibility.json"
     compatibility = json.loads(compatibility_path.read_text(encoding="utf-8")) if compatibility_path.exists() else {}
     registry: dict[str, dict[str, object]] = {}
-    for path in sorted(SCRIPT_ROOT.glob("*.R")):
+    for path in sorted(FUNCTION_ROOT.glob("*.R")):
         if path.name == "amp_common.R":
             continue
         text = path.read_text(encoding="utf-8-sig", errors="replace")
-        module_id = path.stem.lower().replace(".", "-").replace("_", "-")
-        registry[module_id] = {
-            "module_id": module_id,
+        function_id = path.stem.lower().replace(".", "-").replace("_", "-")
+        registry[function_id] = {
+            "function_id": function_id,
             "script": path.name,
             "category": _category(path.name),
             "packages": _packages(text),
             "declared_parameters": _parameters(text),
             "uses_common_adapter": "amp_common.R" in text,
             "status": "registered_untested",
-            "source": "team-authorized EasyMultiOmics R snapshot",
-            "specification": specification(module_id, _category(path.name)),
+            "source": "team-authorized R function collection",
+            "specification": specification(function_id, _category(path.name)),
         }
-        registry[module_id].update(compatibility.get(module_id, {}))
+        registry[function_id].update(compatibility.get(function_id, {}))
     return registry
 
 
-def list_modules(category: str | None = None) -> list[dict[str, object]]:
-    modules = list(module_registry().values())
+def list_functions(category: str | None = None) -> list[dict[str, object]]:
+    functions = list(function_registry().values())
     if category:
-        modules = [module for module in modules if module["category"] == category]
-    return modules
+        functions = [function for function in functions if function["category"] == category]
+    return functions
 
 
-def get_module(module_id: str) -> dict[str, object]:
+def get_function(function_id: str) -> dict[str, object]:
     try:
-        return module_registry()[module_id]
+        return function_registry()[function_id]
     except KeyError as exc:
-        raise ValueError(f"Unknown EMO module: {module_id}") from exc
+        raise ValueError(f"Unknown analysis function: {function_id}") from exc

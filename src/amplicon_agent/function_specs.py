@@ -49,32 +49,32 @@ CATEGORY_SPECS: dict[str, dict[str, Any]] = {
     "other": {
         "purpose": "Specialized visualization or exploratory analysis.",
         "parameters": {},
-        "minimum": "module-specific",
+        "minimum": "function-specific",
     },
 }
 
-TREE_MODULES = {"script-alpha-pd", "script-bnti", "script-bnti-rcbray"}
-FUNCTION_MODULES = {"script-function-bubble", "script-function-diff", "script-kegg-enrich"}
-SOURCE_TRACKING_MODULES = {"script-feast"}
-TERNARY_MODULES = {"script-ternary"}
-GROUP_NETWORK_MODULES = {"script-network-stability", "script-network-robustness"}
+TREE_FUNCTIONS = {"script-alpha-pd", "script-bnti", "script-bnti-rcbray"}
+KO_FUNCTIONS = {"script-function-bubble", "script-function-diff", "script-kegg-enrich"}
+SOURCE_TRACKING_FUNCTIONS = {"script-feast"}
+TERNARY_FUNCTIONS = {"script-ternary"}
+GROUP_NETWORK_FUNCTIONS = {"script-network-stability", "script-network-robustness"}
 
 
-def specification(module_id: str, category: str) -> dict[str, Any]:
+def specification(function_id: str, category: str) -> dict[str, Any]:
     base = dict(CATEGORY_SPECS[category])
-    base["requires_tree"] = module_id in TREE_MODULES
-    base["requires_ko_annotation"] = module_id in FUNCTION_MODULES
-    base["requires_source_sink"] = module_id in SOURCE_TRACKING_MODULES
-    base["requires_exactly_or_at_least_three_groups"] = module_id in TERNARY_MODULES
+    base["requires_tree"] = function_id in TREE_FUNCTIONS
+    base["requires_ko_annotation"] = function_id in KO_FUNCTIONS
+    base["requires_source_sink"] = function_id in SOURCE_TRACKING_FUNCTIONS
+    base["requires_exactly_or_at_least_three_groups"] = function_id in TERNARY_FUNCTIONS
     base["batch_policy"] = "within_batch"
     return base
 
 
-def assess_context(module: dict[str, Any], metadata: pd.DataFrame,
+def assess_context(function: dict[str, Any], metadata: pd.DataFrame,
                    has_tree: bool = False, has_ko: bool = False,
                    source_sink_configured: bool = False) -> dict[str, Any]:
-    module_id = str(module["module_id"])
-    category = str(module["category"])
+    function_id = str(function["function_id"])
+    category = str(function["category"])
     group_col = "Group" if "Group" in metadata.columns else None
     if group_col is None:
         return {"eligible": False, "reason": "normalized Group column is unavailable"}
@@ -83,13 +83,13 @@ def assess_context(module: dict[str, Any], metadata: pd.DataFrame,
     min_group = int(counts.min()) if groups else 0
     n_samples = int(len(metadata))
 
-    if module_id in TREE_MODULES and not has_tree:
+    if function_id in TREE_FUNCTIONS and not has_tree:
         return {"eligible": False, "reason": "phylogenetic tree is required"}
-    if module_id in FUNCTION_MODULES and not has_ko:
+    if function_id in KO_FUNCTIONS and not has_ko:
         return {"eligible": False, "reason": "KO annotation is required"}
-    if module_id in SOURCE_TRACKING_MODULES and not source_sink_configured:
+    if function_id in SOURCE_TRACKING_FUNCTIONS and not source_sink_configured:
         return {"eligible": False, "reason": "source and sink groups must be configured"}
-    if module_id in TERNARY_MODULES and groups < 3:
+    if function_id in TERNARY_FUNCTIONS and groups < 3:
         return {"eligible": False, "reason": "ternary analysis requires at least three groups"}
     if category == "differential_abundance" and (groups < 2 or min_group < 3):
         return {"eligible": False, "reason": "differential analysis requires two groups with at least three samples each"}
@@ -97,9 +97,9 @@ def assess_context(module: dict[str, Any], metadata: pd.DataFrame,
         return {"eligible": False, "reason": "machine learning requires at least ten samples per group"}
     if category == "network" and n_samples < 10:
         return {"eligible": False, "reason": "network analysis requires at least ten samples in the batch"}
-    if module_id in GROUP_NETWORK_MODULES and min_group < 10:
+    if function_id in GROUP_NETWORK_FUNCTIONS and min_group < 10:
         return {"eligible": False, "reason": "group network comparison requires at least ten samples per group"}
-    if category == "beta_diversity" and module_id in {"script-microtest", "script-pair-microtest"} and (groups < 2 or min_group < 2):
+    if category == "beta_diversity" and function_id in {"script-microtest", "script-pair-microtest"} and (groups < 2 or min_group < 2):
         return {"eligible": False, "reason": "group test requires replicated groups"}
     return {"eligible": True, "reason": "requirements satisfied", "sample_count": n_samples,
             "group_count": groups, "minimum_group_size": min_group}

@@ -36,3 +36,21 @@ def test_input_change_invalidates_approval(monkeypatch, tmp_path):
     with pytest.raises(ValueError, match="Input changed"):
         service.approve(contract["plan_id"], f"CONFIRM {contract['plan_id']}")
 
+
+def test_prepare_uses_direct_function_ids(monkeypatch, tmp_path):
+    monkeypatch.setenv("AMPLICON_WORKSPACE", str(tmp_path))
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    for name in ("abundance.csv", "taxonomy.csv", "metadata.csv"):
+        (input_dir / name).write_bytes((DEMO / name).read_bytes())
+    service = AgentService()
+    contract = service.prepare(
+        "input/abundance.csv",
+        "input/taxonomy.csv",
+        "input/metadata.csv",
+        "Group",
+        functions=["qc", "script-alpha"],
+    )
+    assert contract["schema_version"] == "2.0"
+    assert contract["functions"] == ["qc", "script-alpha"]
+    assert "functions/function_manifest.json" in contract["expected_outputs"]

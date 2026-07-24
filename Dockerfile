@@ -10,9 +10,7 @@ WORKDIR /app
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 COPY r ./r
-COPY skills ./skills
 RUN python3 -m pip install --break-system-packages --no-cache-dir .
 
 ENV AMPLICON_WORKSPACE=/workspace
 ENTRYPOINT ["amplicon-agent"]
-

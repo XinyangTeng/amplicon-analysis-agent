@@ -15,8 +15,8 @@ from .inputs import inspect_inputs
 from .models import AnalysisContract, ApprovalResult, RunResult
 from .security import secure_path, sha256_file, token_hash, workspace_root
 from .store import PlanStore
-from .module_registry import get_module, module_registry, SCRIPT_ROOT
-from .module_specs import assess_context
+from .function_registry import get_function, function_registry, FUNCTION_ROOT
+from .function_specs import assess_context
 from .report_builder import build_analysis_report
 
 
@@ -48,10 +48,10 @@ class AgentService:
         return inspect_inputs(abundance, taxonomy, metadata, group_column, batch_column, gradient_column).model_dump()
 
     def prepare(self, abundance: str, taxonomy: str, metadata: str, group_column: str,
-                modules: list[str] | None = None, permutations: int = 999, top_n: int = 10,
+                functions: list[str] | None = None, permutations: int = 999, top_n: int = 10,
                 batch_column: str | None = None, gradient_column: str | None = None,
                 tree: str | None = None, representative_sequences: str | None = None,
-                module_parameters: dict[str, object] | None = None) -> dict:
+                function_parameters: dict[str, object] | None = None) -> dict:
         inspection = inspect_inputs(abundance, taxonomy, metadata, group_column, batch_column, gradient_column)
         if tree:
             tree_path = secure_path(tree)
@@ -61,35 +61,35 @@ class AgentService:
             sequence_path = secure_path(representative_sequences)
             inspection.files.representative_sequences = str(sequence_path)
             inspection.file_hashes["representative_sequences"] = sha256_file(sequence_path)
-        selected_modules = modules or ["qc", "alpha", "beta", "composition"]
-        baseline_modules = {"qc", "alpha", "beta", "composition"}
-        registered_emo = {f"emo:{name}" for name in module_registry()}
-        invalid = sorted(set(selected_modules) - baseline_modules - registered_emo)
+        selected_functions = functions or ["qc", "alpha", "beta", "composition"]
+        baseline_functions = {"qc", "alpha", "beta", "composition"}
+        registered_functions = set(function_registry())
+        invalid = sorted(set(selected_functions) - baseline_functions - registered_functions)
         blockers = list(inspection.blockers)
         if invalid:
-            blockers.append(f"Unsupported modules: {invalid}")
-        for selected in selected_modules:
-            if not selected.startswith("emo:"):
+            blockers.append(f"Unsupported functions: {invalid}")
+        for selected in selected_functions:
+            if selected in baseline_functions:
                 continue
-            module = get_module(selected.removeprefix("emo:"))
-            if module["status"] == "blocked":
-                blockers.append(f"EMO module {selected} is blocked: {module.get('notes', 'compatibility failure')}")
-            elif module["status"] == "registered_untested":
-                inspection.warnings.append(f"EMO module {selected} is registered but has not passed compatibility testing")
-            elif module["status"] == "conditional":
-                inspection.warnings.append(f"EMO module {selected} is conditionally available: {module.get('notes', '')}")
-            spec = module.get("specification", {})
+            function = get_function(selected)
+            if function["status"] == "blocked":
+                blockers.append(f"Analysis function {selected} is blocked: {function.get('notes', 'compatibility failure')}")
+            elif function["status"] == "registered_untested":
+                inspection.warnings.append(f"Analysis function {selected} has not passed compatibility testing")
+            elif function["status"] == "conditional":
+                inspection.warnings.append(f"Analysis function {selected} is conditional: {function.get('notes', '')}")
+            spec = function.get("specification", {})
             if spec.get("requires_tree") and not tree:
-                inspection.warnings.append(f"EMO module {selected} requires a phylogenetic tree and will be skipped with three-table input")
+                inspection.warnings.append(f"Analysis function {selected} requires a phylogenetic tree and will be skipped with three-table input")
             if spec.get("requires_ko_annotation") and not any(
                 str(column).lower() in {"ko", "koid", "kegg_orthology"}
                 for column in inspection.taxonomy_columns
             ):
-                inspection.warnings.append(f"EMO module {selected} requires KO annotation and will be skipped")
+                inspection.warnings.append(f"Analysis function {selected} requires KO annotation and will be skipped")
             if spec.get("requires_source_sink") and not (
-                (module_parameters or {}).get("sink_group") and (module_parameters or {}).get("source_groups")
+                (function_parameters or {}).get("sink_group") and (function_parameters or {}).get("source_groups")
             ):
-                inspection.warnings.append(f"EMO module {selected} requires explicit source/sink configuration and will be skipped")
+                inspection.warnings.append(f"Analysis function {selected} requires explicit source/sink configuration and will be skipped")
         if not 9 <= permutations <= 9999:
             blockers.append("permutations must be between 9 and 9999")
         if not 1 <= top_n <= 50:
@@ -103,18 +103,22 @@ class AgentService:
             gradient_column=gradient_column,
             orientation=inspection.orientation,
             transpose_abundance=inspection.transpose_abundance,
-            modules=selected_modules,
+            functions=selected_functions,
             parameters={
                 "permutations": permutations,
                 "top_n": top_n,
                 "taxonomy_rank": inspection.selected_taxonomy_rank,
                 "distance": "bray",
                 "seed": 20260722,
-                **(module_parameters or {}),
+                **(function_parameters or {}),
             },
             warnings=inspection.warnings,
             blockers=blockers,
-            expected_outputs=EXPECTED_OUTPUTS + (["emo/emo_manifest.json"] if any(x.startswith("emo:") for x in selected_modules) else []),
+            expected_outputs=EXPECTED_OUTPUTS + (
+                ["functions/function_manifest.json"]
+                if any(x not in baseline_functions for x in selected_functions)
+                else []
+            ),
         )
         self.store.save(contract)
         return contract.model_dump()
@@ -166,9 +170,12 @@ class AgentService:
             log_path.write_text(completed.stdout + "\n--- STDERR ---\n" + completed.stderr, encoding="utf-8")
             if completed.returncode != 0:
                 raise RuntimeError(f"R analysis failed with exit code {completed.returncode}")
-            emo_modules = [item.removeprefix("emo:") for item in contract.modules if item.startswith("emo:")]
-            if emo_modules:
-                self._run_emo_modules(contract, run_dir, emo_modules, rscript)
+            function_ids = [
+                item for item in contract.functions
+                if item not in {"qc", "alpha", "beta", "composition"}
+            ]
+            if function_ids:
+                self._run_analysis_functions(contract, run_dir, function_ids, rscript)
             contract.status = "succeeded"
             (run_dir / "analysis_contract.json").write_text(
                 contract.model_dump_json(indent=2), encoding="utf-8"
@@ -238,10 +245,10 @@ class AgentService:
                 raise ValueError(f"Input changed after plan creation: {name}")
 
     @staticmethod
-    def _run_emo_modules(contract: AnalysisContract, run_dir: Path,
-                         module_ids: list[str], rscript: str) -> None:
-        emo_root = run_dir / "emo"
-        logs = emo_root / "logs"
+    def _run_analysis_functions(contract: AnalysisContract, run_dir: Path,
+                                function_ids: list[str], rscript: str) -> None:
+        function_root = run_dir / "functions"
+        logs = function_root / "logs"
         logs.mkdir(parents=True, exist_ok=True)
         params = dict(contract.parameters)
         params.update({
@@ -267,7 +274,7 @@ class AgentService:
         workspaces: list[tuple[str, Path, pd.DataFrame]] = []
         for context_name, context_meta in contexts:
             safe_context = re.sub(r"[^A-Za-z0-9._-]+", "_", context_name)
-            workspace = emo_root / "batches" / safe_context
+            workspace = function_root / "batches" / safe_context
             workspace.mkdir(parents=True, exist_ok=True)
             source_sample_ids = context_meta.iloc[:, 0].astype(str).tolist()
             if "sample_name" in context_meta.columns:
@@ -276,7 +283,7 @@ class AgentService:
                 output_sample_ids = source_sample_ids
             missing = sorted(set(source_sample_ids) - set(map(str, abundance.columns[1:])))
             if missing:
-                raise RuntimeError(f"Cannot create EMO batch workspace; missing samples: {missing}")
+                raise RuntimeError(f"Cannot create function workspace; missing samples: {missing}")
             context_abundance = abundance.loc[:, [abundance.columns[0], *source_sample_ids]].copy()
             context_abundance.columns = [context_abundance.columns[0], *output_sample_ids]
             context_abundance.to_csv(workspace / "otutab.txt", sep="\t", index=False)
@@ -298,23 +305,23 @@ class AgentService:
             normalized_meta["Group"] = normalized_meta[contract.group_column].astype(str)
             workspaces.append((safe_context, workspace, normalized_meta))
 
-        manifest: dict[str, object] = {"modules": {}, "contexts": [x[0] for x in workspaces], "status": "running"}
+        manifest: dict[str, object] = {"functions": {}, "contexts": [x[0] for x in workspaces], "status": "running"}
         failures: list[str] = []
         env = r_subprocess_environment()
-        env["SCRIPT_DIR"] = str(SCRIPT_ROOT)
-        for module_id in module_ids:
-            module = get_module(module_id)
-            script = SCRIPT_ROOT / str(module["script"])
-            module_runs: dict[str, object] = {}
+        env["SCRIPT_DIR"] = str(FUNCTION_ROOT)
+        for function_id in function_ids:
+            function = get_function(function_id)
+            script = FUNCTION_ROOT / str(function["script"])
+            function_runs: dict[str, object] = {}
             for context_name, workspace, context_meta in workspaces:
                 eligibility = assess_context(
-                    module, context_meta,
+                    function, context_meta,
                     has_tree=(workspace / "otus.tree").exists(),
                     has_ko=any(str(column).lower() in {"ko", "koid", "kegg_orthology"} for column in taxonomy.columns),
                     source_sink_configured=bool(params.get("sink_group") and params.get("source_groups")),
                 )
                 if not eligibility["eligible"]:
-                    module_runs[context_name] = {
+                    function_runs[context_name] = {
                         "status": "skipped", "reason": eligibility["reason"]
                     }
                     continue
@@ -323,24 +330,28 @@ class AgentService:
                     capture_output=True, text=True, encoding="utf-8", errors="replace",
                     timeout=1800, check=False,
                 )
-                log_name = f"{module_id}--{context_name}.log"
+                log_name = f"{function_id}--{context_name}.log"
                 (logs / log_name).write_text(
                     completed.stdout + "\n--- STDERR ---\n" + completed.stderr, encoding="utf-8"
                 )
-                module_runs[context_name] = {
+                function_runs[context_name] = {
                     "return_code": completed.returncode,
                     "status": "succeeded" if completed.returncode == 0 else "failed",
                     "log": f"logs/{log_name}",
                 }
                 if completed.returncode != 0:
-                    failures.append(f"{module_id} ({context_name})")
-            manifest["modules"][module_id] = {
-                "script": module["script"], "category": module["category"], "runs": module_runs
+                    failures.append(f"{function_id} ({context_name})")
+            manifest["functions"][function_id] = {
+                "script": function["script"], "category": function["category"], "runs": function_runs
             }
         manifest["status"] = "failed" if failures else "succeeded"
-        manifest["files"] = [str(path.relative_to(emo_root)) for path in emo_root.rglob("*") if path.is_file()]
-        (emo_root / "emo_manifest.json").write_text(
+        manifest["files"] = [
+            str(path.relative_to(function_root))
+            for path in function_root.rglob("*")
+            if path.is_file()
+        ]
+        (function_root / "function_manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         if failures:
-            raise RuntimeError("EMO modules failed: " + ", ".join(failures))
+            raise RuntimeError("Analysis functions failed: " + ", ".join(failures))

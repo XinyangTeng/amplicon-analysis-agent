@@ -3,7 +3,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from .service import AgentService
-from .module_registry import get_module, list_modules
+from .function_registry import get_function, list_functions
 
 
 mcp = FastMCP(
@@ -19,16 +19,16 @@ service = AgentService()
 
 
 @mcp.tool()
-def list_amplicon_analysis_modules(category: str | None = None) -> dict:
-    """List all registered team EMO analysis modules, optionally filtered by category."""
-    modules = list_modules(category)
-    return {"count": len(modules), "modules": modules}
+def list_amplicon_analysis_functions(category: str | None = None) -> dict:
+    """List registered analysis functions, optionally filtered by category."""
+    functions = list_functions(category)
+    return {"count": len(functions), "functions": functions}
 
 
 @mcp.tool()
-def inspect_amplicon_module(module_id: str) -> dict:
-    """Return provenance and declared package requirements for one EMO module."""
-    return get_module(module_id)
+def inspect_amplicon_function(function_id: str) -> dict:
+    """Return requirements, parameters, status, and provenance for one analysis function."""
+    return get_function(function_id)
 
 
 @mcp.tool()
@@ -41,15 +41,15 @@ def inspect_amplicon_inputs(abundance: str, taxonomy: str, metadata: str, group_
 
 @mcp.tool()
 def prepare_amplicon_analysis(abundance: str, taxonomy: str, metadata: str, group_column: str,
-                               modules: list[str] | None = None, permutations: int = 999,
+                               functions: list[str] | None = None, permutations: int = 999,
                                top_n: int = 10, batch_column: str | None = None,
                                gradient_column: str | None = None, tree: str | None = None,
                                representative_sequences: str | None = None,
-                               module_parameters: dict[str, object] | None = None) -> dict:
+                               function_parameters: dict[str, object] | None = None) -> dict:
     """Create an immutable analysis contract. This does not execute analysis."""
-    return service.prepare(abundance, taxonomy, metadata, group_column, modules, permutations, top_n,
+    return service.prepare(abundance, taxonomy, metadata, group_column, functions, permutations, top_n,
                            batch_column, gradient_column, tree, representative_sequences,
-                           module_parameters)
+                           function_parameters)
 
 
 @mcp.tool()

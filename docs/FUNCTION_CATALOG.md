@@ -1,8 +1,8 @@
-# EMO analysis module catalog
+# Analysis function catalog
 
-Generated from the executable registry. `verified` means the module completed a smoke test; `conditional` means implementation is present but extra inputs or sample size are required.
+Generated from the executable registry. `verified` means the function completed a smoke test; `conditional` means implementation is present but extra inputs or sample size are required.
 
-| Module | Category | Status | Declared parameters | Requirements |
+| Function | Category | Status | Declared parameters | Requirements |
 |---|---|---|---|---|
 | `cir-barplot-micro` | composition | verified | comp_top_n, cuttree, dist, hcluter_method | Completed compatibility smoke testing; input-specific prerequisites still apply. |
 | `cir-plot-micro` | composition | verified | comp_tax_level, comp_top_n | Completed compatibility smoke testing; input-specific prerequisites still apply. |
@@ -43,7 +43,7 @@ Generated from the executable registry. `verified` means the module completed a 
 | `script-network-stability` | network | conditional | big_network, cluster_method, cor_cutoff, fill_rank, layout_net, maxnode, ncpus, p_cutoff, random_times, step, top_n | network analysis requires at least ten samples in the batch |
 | `script-neutral-model` | community_assembly | verified | — | Completed compatibility smoke testing; input-specific prerequisites still apply. |
 | `script-nnet` | biomarker_ml | conditional | folds, seed, top_n | machine learning requires at least ten samples per group |
-| `script-nullmodel` | community_assembly | verified | distance_method, gamma_method, min_taxa_sum, null_model, transfer | Completed compatibility smoke testing; input-specific prerequisites still apply. |
+| `script-nullmodel` | community_assembly | conditional | distance_method, gamma_method, min_taxa_sum, null_model, transfer | Requires a compatible nullModel implementation in the R runtime. |
 | `script-pair-microtest` | beta_diversity | verified | distance_method, pair_method | Completed compatibility smoke testing; input-specific prerequisites still apply. |
 | `script-pca` | beta_diversity | verified | top_n | Completed compatibility smoke testing; input-specific prerequisites still apply. |
 | `script-random-forest` | biomarker_ml | conditional | optimal | machine learning requires at least ten samples per group |

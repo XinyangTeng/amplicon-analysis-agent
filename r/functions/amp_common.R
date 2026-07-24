@@ -4,7 +4,7 @@ suppressPackageStartupMessages({
   required_packages <- c("jsonlite", "phyloseq", "tidyverse", "Biostrings", "ggsci",
                          "openxlsx", "ape", "picante", "minpack.lm", "Hmisc", "fs")
   missing_required <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
-  if (length(missing_required)) stop("Missing required EMO packages: ", paste(missing_required, collapse = ", "))
+  if (length(missing_required)) stop("Missing required analysis packages: ", paste(missing_required, collapse = ", "))
   for (pkg_name in required_packages) library(pkg_name, character.only = TRUE)
   for (pkg_name in c("ggClusterNet", "EasyMicroPlot", "EasyStat", "TOmicsVis")) {
     if (requireNamespace(pkg_name, quietly = TRUE)) library(pkg_name, character.only = TRUE)
@@ -13,7 +13,7 @@ suppressPackageStartupMessages({
 })
 
 load_amp_legacy_packages <- function() {
-  package_candidates <- c("EasyMultiOmics", "EasyMicroPlot", "EasyStat", "TOmicsVis", "ggClusterNet")
+  package_candidates <- c("EasyMicroPlot", "EasyStat", "TOmicsVis", "ggClusterNet")
   for (pkg in package_candidates) {
     if (requireNamespace(pkg, quietly = TRUE)) {
       suppressPackageStartupMessages(library(pkg, character.only = TRUE))
@@ -25,6 +25,61 @@ load_amp_legacy_packages <- function() {
 
 load_amp_legacy_packages()
 
+if (!exists("package.amp", mode = "function")) {
+  package.amp <- function() invisible(TRUE)
+}
+
+if (!exists("theme_my", mode = "function")) {
+  theme_my <- function(ps = NULL) {
+    base_theme <- ggplot2::theme_bw() +
+      ggplot2::theme(
+        panel.grid = ggplot2::element_blank(),
+        axis.text = ggplot2::element_text(color = "black"),
+        axis.title = ggplot2::element_text(color = "black")
+      )
+    colors <- grDevices::hcl.colors(12, palette = "Dark 3")
+    list(base_theme, base_theme, colors, colors, colors, colors)
+  }
+}
+
+if (!exists("theme_nature", mode = "function")) {
+  theme_nature <- function() {
+    ggplot2::theme_bw() +
+      ggplot2::theme(
+        panel.grid = ggplot2::element_blank(),
+        axis.text = ggplot2::element_text(color = "black"),
+        axis.title = ggplot2::element_text(color = "black"),
+        legend.key = ggplot2::element_blank()
+      )
+  }
+}
+
+if (!exists("alpha.micro", mode = "function")) {
+  alpha.micro <- function(ps, group = "Group") {
+    counts <- as(phyloseq::otu_table(ps), "matrix")
+    if (phyloseq::taxa_are_rows(ps)) counts <- t(counts)
+    counts <- as.matrix(counts)
+    estimates <- vegan::estimateR(counts)
+    richness <- rowSums(counts > 0)
+    shannon <- vegan::diversity(counts, index = "shannon")
+    metadata <- data.frame(phyloseq::sample_data(ps), check.names = FALSE)
+    result <- data.frame(
+      Shannon = shannon,
+      Chao1 = as.numeric(estimates["S.chao1", rownames(counts)]),
+      Inv_Simpson = vegan::diversity(counts, index = "invsimpson"),
+      Richness = richness,
+      ACE = as.numeric(estimates["S.ACE", rownames(counts)]),
+      Pielou_evenness = ifelse(richness > 1, shannon / log(richness), 0),
+      check.names = FALSE,
+      row.names = rownames(counts)
+    )
+    if (group %in% colnames(metadata)) {
+      result[[group]] <- metadata[rownames(result), group]
+    }
+    result
+  }
+}
+
 `%||%` <- function(x, y) {
   if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
 }
@@ -34,12 +89,12 @@ read_amp_params <- function(param_file = "params.json") {
     aliases <- list(
       group_col = c("group_column"),
       color_theme = c("color_palette"),
-      top_n = c("comp_top_n", "biomarker_top_n", "function_top_n", "module_top_n", "ml_top_variance_n", "beta_feature_top_n"),
+      top_n = c("comp_top_n", "biomarker_top_n", "function_top_n", "ml_top_variance_n", "beta_feature_top_n"),
       filter_top_n = c("feature_top_n", "top_n", "ml_top_variance_n", "beta_feature_top_n"),
       optimal = c("ml_top_variance_n", "biomarker_top_n", "top_n"),
       folds = c("ml_cv_folds"),
       repnum = c("ml_cv_folds"),
-      p_cutoff = c("da_p_cutoff", "net_p_cutoff", "module_p_cutoff"),
+      p_cutoff = c("da_p_cutoff", "net_p_cutoff"),
       cor_cutoff = c("net_cor_cutoff"),
       distance_method = c("beta_distance_metric", "assembly_distance"),
       dist = c("comp_distance_metric", "distance_method"),
@@ -48,12 +103,12 @@ read_amp_params <- function(param_file = "params.json") {
       heatnum = c("heatmap_feature_n"),
       tax_rank = c(
         "comp_tax_level", "da_tax_level", "lefse_tax_level", "net_tax_level",
-        "assembly_tax_level", "ml_tax_level", "module_tax_level", "alpha_tax_level"
+        "assembly_tax_level", "ml_tax_level", "alpha_tax_level"
       ),
-      tax_level = c("da_tax_level", "comp_tax_level", "lefse_tax_level", "module_tax_level"),
+      tax_level = c("da_tax_level", "comp_tax_level", "lefse_tax_level"),
       fill_rank = c("net_tax_level", "comp_tax_level"),
       layout_net = c("net_layout"),
-      permutations = c("beta_permutations", "assembly_null_model_runs", "module_permutations"),
+      permutations = c("beta_permutations", "assembly_null_model_runs"),
       lda_cutoff = c("lefse_lda_cutoff"),
       adjust_p = c("lefse_p_adjust", "da_p_adjust", "alpha_p_adjust"),
       lfc_cutoff = c("da_logfc_cutoff"),
@@ -367,9 +422,9 @@ write_sheet2 <- function(workbook, sheet_name, data) {
   invisible(workbook)
 }
 
-amp_note_table <- function(module, message, suggestion = "") {
+amp_note_table <- function(function_name, message, suggestion = "") {
   data.frame(
-    module = module,
+    function_name = function_name,
     status = "skipped_or_fallback",
     message = as.character(message),
     suggestion = as.character(suggestion),

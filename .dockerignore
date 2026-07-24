@@ -1,7 +1,14 @@
 .git
+.claude
+.mcp.json
 .pytest_cache
+.ruff_cache
+.mypy_cache
 __pycache__
+*.pyc
 runs
 .amplicon-agent
 outputs
-
+build
+dist
+*.egg-info

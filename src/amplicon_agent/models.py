@@ -37,7 +37,7 @@ class InspectionResult(BaseModel):
 
 
 class AnalysisContract(BaseModel):
-    schema_version: str = "1.2"
+    schema_version: str = "2.0"
     plan_id: str
     created_at: str = Field(default_factory=utc_now)
     files: InputFiles
@@ -47,7 +47,7 @@ class AnalysisContract(BaseModel):
     gradient_column: str | None = None
     orientation: str
     transpose_abundance: bool
-    modules: list[str]
+    functions: list[str]
     parameters: dict[str, object]
     warnings: list[str]
     blockers: list[str]

@@ -6,9 +6,8 @@
         "run", "--rm", "-i",
         "-v", "${PWD}:/workspace",
         "-e", "AMPLICON_WORKSPACE=/workspace",
-        "amplicon-analysis-agent:0.1.0"
+        "amplicon-analysis-agent:0.2.0"
       ]
     }
   }
 }
-

@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from amplicon_agent.inputs import inspect_inputs
-from amplicon_agent.module_registry import get_module, list_modules
+from amplicon_agent.function_registry import get_function, list_functions
 
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo"
@@ -59,11 +59,12 @@ def test_batch_and_ordered_gradient_design_is_summarized(monkeypatch, tmp_path):
     assert result.design_summary["batches"]["gradient"]["gradient_levels"] == [1.0, 2.0, 3.0]
 
 
-def test_all_team_modules_are_registered_with_compatibility_status():
-    modules = list_modules()
-    assert len(modules) == 55
-    assert get_module("script-alpha")["status"] == "verified"
-    assert get_module("script-barplot")["status"] == "verified"
-    assert get_module("script-alpha-pd")["status"] == "conditional"
-    assert get_module("script-alpha-pd")["specification"]["requires_tree"] is True
-    assert any(item["name"] == "permutations" for item in get_module("script-bnti")["declared_parameters"])
+def test_all_analysis_functions_are_registered_with_compatibility_status():
+    functions = list_functions()
+    assert len(functions) == 55
+    assert all("function_id" in function for function in functions)
+    assert get_function("script-alpha")["status"] == "verified"
+    assert get_function("script-barplot")["status"] == "verified"
+    assert get_function("script-alpha-pd")["status"] == "conditional"
+    assert get_function("script-alpha-pd")["specification"]["requires_tree"] is True
+    assert any(item["name"] == "permutations" for item in get_function("script-bnti")["declared_parameters"])

@@ -17,7 +17,7 @@ library(ape)
 library(picante)
 library(fs)
 library(ggvenn)
-# library(mia) # disabled: can mask phyloseq/EasyMultiOmics methods in server runtime
+# library(mia) # disabled: can mask phyloseq methods in the server runtime
 
 
 if (file.exists("ps.rds")) {

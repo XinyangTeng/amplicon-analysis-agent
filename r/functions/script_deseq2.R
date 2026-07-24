@@ -14,7 +14,7 @@ res <- tryCatch(
     j = tax_level
   ),
   error = function(original_error) {
-    message("EasyMultiOmics DESeq2 wrapper failed; using native DESeq2 fallback: ", conditionMessage(original_error))
+    message("Legacy DESeq2 wrapper failed; using native DESeq2 fallback: ", conditionMessage(original_error))
     suppressPackageStartupMessages(library(DESeq2))
     ps_use <- ps.16s %>% ggClusterNet::filter_OTU_ps(top_n)
     count_matrix <- as(phyloseq::otu_table(ps_use), "matrix")

@@ -16,7 +16,7 @@ library(ape)
 library(picante)
 library(fs)
 library(ggvenn)
-# library(mia) # disabled: can mask phyloseq/EasyMultiOmics methods in server runtime
+# library(mia) # disabled: can mask phyloseq methods in the server runtime
 
 
 if (file.exists("ps.rds")) {
@@ -91,7 +91,7 @@ res16 <- tryCatch(
     Top   = comp_top_n
   ),
   error = function(original_error) {
-    message("EasyMultiOmics barplot wrapper failed; using native phyloseq fallback: ", conditionMessage(original_error))
+    message("Legacy barplot wrapper failed; using native phyloseq fallback: ", conditionMessage(original_error))
     ps_rank <- phyloseq::tax_glom(pst, taxrank = comp_tax_level, NArm = FALSE)
     ps_rel <- phyloseq::transform_sample_counts(ps_rank, function(x) x / sum(x) * 100)
     long <- phyloseq::psmelt(ps_rel)

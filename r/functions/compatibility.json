@@ -200,9 +200,9 @@
     "notes": "machine learning requires at least ten samples per group"
   },
   "script-nullmodel": {
-    "status": "verified",
+    "status": "conditional",
     "tested_on": "2026-07-23",
-    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
+    "notes": "Requires a compatible nullModel implementation in the R runtime."
   },
   "script-pair-microtest": {
     "status": "verified",
