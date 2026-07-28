@@ -14,3 +14,6 @@ function_smoke_summary.json
 build/
 dist/
 *.egg-info/
+workspace/
+uploads/
+.env

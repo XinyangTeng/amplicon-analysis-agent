@@ -1,0 +1,26 @@
+services:
+  amplicon-web:
+    build:
+      context: .
+    image: amplicon-analysis-agent:0.3.0
+    command: ["amplicon-web"]
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    environment:
+      AMPLICON_WORKSPACE: /workspace
+      AMPLICON_WEB_TOKEN: "${AMPLICON_WEB_TOKEN:-}"
+      AMPLICON_MAX_UPLOAD_MB: "${AMPLICON_MAX_UPLOAD_MB:-200}"
+      MODEL_PROVIDER: "${MODEL_PROVIDER:-}"
+      MODEL_PROTOCOL: "${MODEL_PROTOCOL:-}"
+      MODEL_BASE_URL: "${MODEL_BASE_URL:-}"
+      MODEL_NAME: "${MODEL_NAME:-}"
+      MODEL_API_KEY: "${MODEL_API_KEY:-}"
+    volumes:
+      - ./workspace:/workspace
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 20s

@@ -12,3 +12,6 @@ outputs
 build
 dist
 *.egg-info
+workspace
+uploads
+.env
