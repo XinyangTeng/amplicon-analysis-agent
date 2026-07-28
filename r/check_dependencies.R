@@ -5,7 +5,7 @@ packages <- c(
   "ggsci", "openxlsx", "ape", "picante", "minpack.lm", "Hmisc", "fs",
   "randomForest", "caret", "e1071", "glmnet", "rpart", "ipred", "ROCR",
   "DESeq2", "ggpubr", "ggrepel", "patchwork", "reshape2", "igraph",
-  "ggraph", "pulsar", "MASS", "nnet"
+  "ggraph", "pulsar", "MASS", "nnet", "edgeR", "ggalluvial"
 )
 status <- data.frame(
   package = packages,

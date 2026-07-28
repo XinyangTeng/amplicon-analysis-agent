@@ -12,11 +12,13 @@ from amplicon_agent.service import AgentService
 parser = argparse.ArgumentParser(description="Run all registered functions on the comprehensive example")
 parser.add_argument("--workspace", type=Path, default=Path(__file__).parents[1])
 parser.add_argument("--output", type=Path, default=Path("function_smoke_summary.json"))
+parser.add_argument("--functions", nargs="+", help="Optional function IDs; defaults to all registered functions")
 args = parser.parse_args()
 root = args.workspace.resolve()
 os.environ["AMPLICON_WORKSPACE"] = str(root)
 
-functions = ["qc", "alpha", "beta", "composition", *[item["function_id"] for item in list_functions()]]
+selected = args.functions or [item["function_id"] for item in list_functions()]
+functions = ["qc", "alpha", "beta", "composition", *selected]
 design = {
     "research_question": "Demonstrate group-associated microbiome changes",
     "sample_type": "synthetic rhizosphere soil",
@@ -42,6 +44,7 @@ contract = service.prepare(
     },
     project_design=design,
     analysis_scope="full",
+    allow_blocked_functions=True,
 )
 if contract["blockers"]:
     raise SystemExit(json.dumps(contract["blockers"], ensure_ascii=False))

@@ -101,13 +101,15 @@ claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e
 
 ## MCP 工具
 
-`inspect_amplicon_inputs`、`prepare_amplicon_analysis`、`approve_analysis`、`run_amplicon_analysis`、`get_run_status`、`validate_amplicon_results`、`get_analysis_report`、`get_report_context`、`save_analysis_interpretation`。
+`inspect_amplicon_inputs`、`prepare_amplicon_analysis`、`approve_analysis`、`run_amplicon_analysis`、`get_run_status`、`validate_amplicon_results`、`get_analysis_report`、`get_report_context`、`get_result_table`、`save_analysis_interpretation`。
+
+`get_report_context` 默认只返回设计、校验、统计摘要、PNG 路径和结果表索引；Agent 仅在需要为某项结论取证时调用 `get_result_table` 读取指定 CSV/TSV，避免把所有结果表一次性塞入上下文。
 
 扩展能力查询工具：`list_amplicon_analysis_functions`、`inspect_amplicon_function`。
 
 完整的55个函数、状态、参数和前置条件见 [`docs/FUNCTION_CATALOG.md`](docs/FUNCTION_CATALOG.md)。
 
-函数兼容状态由当前环境的全量冒烟测试清单生成，而不是人工宣称。条件函数只有在输入和样本量要求满足时才执行；不适用批次会写入 `skipped` 和明确原因，不会伪造结果。运行 `python scripts/update_compatibility_from_manifest.py function_smoke_summary.json` 可同步本次验收状态。
+函数兼容状态由当前环境的全量冒烟测试清单生成，而不是人工宣称。当前综合示例在同一合同内完成 55/55 个函数，兼容清单为 55 个 `verified`、0 个 `blocked`。真实项目仍会根据样本量、树、KO/Pathway 和 source/sink 等前提动态跳过不适用方法。运行 `python scripts/update_compatibility_from_manifest.py function_smoke_summary.json` 可同步新的验收状态。
 
 多实验数据应在检查和计划工具中同时传入 `batch_column`。剂量、时间或胁迫强度为有序数值时传入 `gradient_column`。此时分类实验在批次内部运行 Kruskal–Wallis、PERMANOVA 与离散度检验；完整数值梯度运行 Spearman Alpha 趋势和连续变量 PERMANOVA。Agent 不执行跨批次的总体显著性检验。
 

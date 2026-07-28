@@ -27,3 +27,7 @@ Pass a phylogenetic tree through `tree` for PD/bNTI functions and representative
 through `representative_sequences` when required. Pass function-specific settings through
 `function_parameters`; source tracking requires `sink_group` and `source_groups`. Treat every
 supplementary file and parameter change as a new contract requiring approval.
+
+The legacy function ID `script-feast` now routes to the repository's self-contained
+nonnegative constrained source-contribution estimator. It is not the original FEAST
+algorithm and must be described with that limitation in the report.

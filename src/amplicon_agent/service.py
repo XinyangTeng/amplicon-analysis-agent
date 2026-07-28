@@ -53,7 +53,8 @@ class AgentService:
                 tree: str | None = None, representative_sequences: str | None = None,
                 function_parameters: dict[str, object] | None = None,
                 project_design: dict[str, object] | None = None,
-                analysis_scope: str = "targeted") -> dict:
+                analysis_scope: str = "targeted",
+                allow_blocked_functions: bool = False) -> dict:
         inspection = inspect_inputs(abundance, taxonomy, metadata, group_column, batch_column, gradient_column)
         if tree:
             tree_path = secure_path(tree)
@@ -84,8 +85,12 @@ class AgentService:
             if selected in baseline_functions:
                 continue
             function = get_function(selected)
-            if function["status"] == "blocked":
+            if function["status"] == "blocked" and not allow_blocked_functions:
                 blockers.append(f"Analysis function {selected} is blocked: {function.get('notes', 'compatibility failure')}")
+            elif function["status"] == "blocked":
+                inspection.warnings.append(
+                    f"Development retest enabled for blocked function {selected}; do not use this in production"
+                )
             elif function["status"] == "registered_untested":
                 inspection.warnings.append(f"Analysis function {selected} has not passed compatibility testing")
             elif function["status"] == "conditional":
@@ -98,6 +103,13 @@ class AgentService:
                 for column in inspection.taxonomy_columns
             ):
                 inspection.warnings.append(f"Analysis function {selected} requires KO annotation and will be skipped")
+            if spec.get("requires_pathway_annotation") and not any(
+                str(column).lower() in {"pathway", "kegg_pathway", "pathway_id"}
+                for column in inspection.taxonomy_columns
+            ):
+                inspection.warnings.append(
+                    f"Analysis function {selected} requires Pathway annotation and will be skipped"
+                )
             if spec.get("requires_source_sink") and not (
                 (function_parameters or {}).get("sink_group") and (function_parameters or {}).get("source_groups")
             ):
@@ -264,6 +276,11 @@ class AgentService:
                 {"path": item.get("path"), "section": item.get("section"), "context": item.get("context")}
                 for item in artifacts.get("figures", [])
             ],
+            "result_tables": [
+                item.get("path")
+                for item in artifacts.get("files", [])
+                if item.get("extension") in {".csv", ".tsv"}
+            ],
         }
         return {
             "schema_version": data.get("schema_version"),
@@ -275,6 +292,35 @@ class AgentService:
             "artifacts": compact_artifacts,
             "interpretation": data.get("interpretation"),
             "interpretation_policy": data.get("interpretation_policy"),
+        }
+
+    def result_table(self, plan_id: str, relative_path: str, limit: int = 50) -> dict:
+        """Read one selected result table on demand instead of expanding every table into context."""
+        if not 1 <= limit <= 200:
+            raise ValueError("limit must be between 1 and 200")
+        validation = self.validate(plan_id)
+        if validation["status"] != "pass":
+            raise ValueError("Results must pass validation before reading result tables")
+        contract = self.store.load(plan_id)
+        if not contract.run_directory:
+            raise ValueError("Plan has not been run")
+        run_dir = secure_path(contract.run_directory).resolve()
+        path = secure_path(run_dir / relative_path).resolve()
+        if run_dir not in path.parents:
+            raise ValueError("Result table must be inside the run directory")
+        if path.suffix.lower() not in {".csv", ".tsv"}:
+            raise ValueError("Only CSV and TSV result tables can be read")
+        separator = "\t" if path.suffix.lower() == ".tsv" else ","
+        frame = pd.read_csv(path, sep=separator, encoding="utf-8-sig")
+        preview = frame.head(limit).astype(object)
+        preview = preview.where(pd.notna(preview), None)
+        return {
+            "path": relative_path.replace("\\", "/"),
+            "row_count": int(len(frame)),
+            "column_count": int(len(frame.columns)),
+            "columns": list(map(str, frame.columns)),
+            "rows": preview.to_dict(orient="records"),
+            "truncated": len(frame) > limit,
         }
 
     def save_interpretation(self, plan_id: str, interpretation: dict[str, object]) -> dict:
@@ -379,6 +425,10 @@ class AgentService:
                     function, context_meta,
                     has_tree=(workspace / "otus.tree").exists(),
                     has_ko=any(str(column).lower() in {"ko", "koid", "kegg_orthology"} for column in taxonomy.columns),
+                    has_pathway=any(
+                        str(column).lower() in {"pathway", "kegg_pathway", "pathway_id"}
+                        for column in taxonomy.columns
+                    ),
                     source_sink_configured=bool(params.get("sink_group") and params.get("source_groups")),
                 )
                 if not eligibility["eligible"]:

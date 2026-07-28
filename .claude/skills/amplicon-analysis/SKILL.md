@@ -20,7 +20,7 @@ After the user answers:
 7. Call `prepare_amplicon_analysis` with the confirmed `project_design` and `analysis_scope`. Show the immutable contract, parameters, warnings, expected outputs, and plan ID.
 8. Never approve for the user. Continue only after the exact phrase `CONFIRM <plan_id>`.
 9. Approve, run, then validate. Never interpret failed or incomplete output.
-10. Call compact `get_report_context`. Interpret the results using the confirmed design and [references/interpretation.md](references/interpretation.md), then call `save_analysis_interpretation`.
+10. Call compact `get_report_context`. Use `get_result_table` only for the shortlisted evidence tables needed to support claims. Interpret the results using the confirmed design and [references/interpretation.md](references/interpretation.md), then call `save_analysis_interpretation`.
 11. Return the rebuilt HTML report path.
 
 ## Responsibility boundary

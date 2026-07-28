@@ -6,6 +6,24 @@ from datetime import date
 from pathlib import Path
 
 
+METHOD_NOTES = {
+    "script-feast": (
+        "Verified constrained nonnegative source-contribution estimator. "
+        "This is a transparent local approximation and not the original FEAST algorithm."
+    ),
+    "script-neutral-model": "Verified self-contained Sloan neutral-community model.",
+    "script-nullmodel": "Verified group-label permutation null model for between-minus-within Bray distance.",
+    "script-bnti": "Verified abundance-weighted betaNTI with phylogenetic tip-label randomization.",
+    "script-bnti-rcbray": "Verified betaNTI plus modified Raup-Crick Bray-Curtis workflow.",
+    "script-rcbray": "Verified modified Raup-Crick Bray-Curtis null model.",
+    "script-stamp": "Verified rank-based abundance-difference view with Wilcoxon tests and BH correction.",
+    "script-volcano-specific": "Verified rank-based volcano analysis with Wilcoxon tests and BH correction.",
+    "script-function-bubble": "Verified predicted-KO rank-based differential bubble plot.",
+    "script-function-diff": "Verified predicted-KO rank-based differential analysis.",
+    "script-kegg-enrich": "Verified offline KO-to-Pathway Fisher over-representation analysis.",
+}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Merge a function smoke-test manifest into compatibility.json")
     parser.add_argument("manifest", type=Path)
@@ -30,7 +48,10 @@ def main() -> None:
             notes = "Compatibility smoke test failed: " + ", ".join(failed)
         elif "succeeded" in statuses:
             status = "verified"
-            notes = "Completed compatibility smoke testing; input-specific prerequisites still apply."
+            notes = METHOD_NOTES.get(
+                function_id,
+                "Completed compatibility smoke testing; input-specific prerequisites still apply.",
+            )
         else:
             status = "conditional"
             reasons = sorted({str(run.get("reason")) for run in runs.values() if run.get("reason")})

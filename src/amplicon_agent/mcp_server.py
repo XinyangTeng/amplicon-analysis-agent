@@ -9,9 +9,12 @@ from .function_registry import get_function, list_functions
 mcp = FastMCP(
     "Amplicon Analysis Agent",
     instructions=(
-        "Inspect inputs before preparing a plan. Never run a plan before the user explicitly approves it. "
+        "Start every project with intake questions, even when files are already present. "
+        "Inspect inputs, then explicitly confirm treatments, controls, contrasts, and scope before preparing. "
+        "Never run a plan before the user explicitly approves it. "
         "Explain blockers, warnings, statistical limits, and the evidence supporting every conclusion. "
-        "After execution, validate first and use get_report_context for interpretation; numerical analysis "
+        "After execution, validate first, use compact get_report_context, and read only selected evidence "
+        "tables with get_result_table; numerical analysis "
         "and report assembly are deterministic executor responsibilities, not language-model tasks."
     ),
 )
@@ -97,6 +100,12 @@ def get_analysis_report(plan_id: str) -> dict:
 def get_report_context(plan_id: str) -> dict:
     """Return a compact validated context for LLM interpretation."""
     return service.report_context(plan_id)
+
+
+@mcp.tool()
+def get_result_table(plan_id: str, relative_path: str, limit: int = 50) -> dict:
+    """Read one validated CSV/TSV result table on demand; use paths from get_report_context."""
+    return service.result_table(plan_id, relative_path, limit)
 
 
 @mcp.tool()

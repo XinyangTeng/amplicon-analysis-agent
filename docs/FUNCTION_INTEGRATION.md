@@ -13,9 +13,11 @@ Each function:
 - declares parameters and prerequisites through the Python function registry;
 - is executed only after input inspection and one-time approval.
 
-The shared adapter `r/functions/amp_common.R` handles input loading, parameter aliases,
-plot export, workbook output, and optional dependency loading. Individual functions remain
-responsible for their own statistical method.
+The shared runtime `r/functions/amp_common.R` contains reusable, self-contained method
+implementations for diversity, composition, differential analysis, machine learning,
+network analysis, assembly models, source contribution, and predicted-function analysis.
+The thin function scripts select one method and result directory. This avoids hidden
+package wrappers while keeping every function independently callable and auditable.
 
 ## Compatibility states
 

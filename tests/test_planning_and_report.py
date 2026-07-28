@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from amplicon_agent.report_builder import build_analysis_report
+from amplicon_agent.models import AnalysisContract, InputFiles
 from amplicon_agent.service import AgentService
 
 
@@ -45,3 +46,37 @@ def test_report_embeds_only_png_and_interpretation(tmp_path):
     assert "针对胁迫效应的解释" in text
     assert "<img" in text and "same.png" in text
     assert "src='figures/same.pdf'" not in text
+
+
+def test_result_table_is_read_on_demand_and_stays_inside_run(monkeypatch, tmp_path):
+    monkeypatch.setenv("AMPLICON_WORKSPACE", str(tmp_path))
+    run = tmp_path / "runs" / "plan"
+    table = run / "functions" / "result.csv"
+    table.parent.mkdir(parents=True)
+    table.write_text("feature,value\nA,1\nB,2\n", encoding="utf-8")
+    (run / "validation.json").write_text('{"status":"pass"}', encoding="utf-8")
+    contract = AnalysisContract(
+        plan_id="plan",
+        files=InputFiles(abundance="a", taxonomy="t", metadata="m"),
+        file_hashes={},
+        group_column="Group",
+        orientation="feature_by_sample",
+        transpose_abundance=False,
+        functions=[],
+        parameters={},
+        warnings=[],
+        blockers=[],
+        expected_outputs=[],
+        project_design={
+            "research_question": "demo", "sample_type": "soil",
+            "treatments": ["T"], "controls": ["C"],
+        },
+        status="succeeded",
+        run_directory=str(run),
+    )
+    service = AgentService()
+    service.store.save(contract)
+    result = service.result_table("plan", "functions/result.csv", limit=1)
+    assert result["row_count"] == 2
+    assert result["rows"] == [{"feature": "A", "value": 1}]
+    assert result["truncated"] is True

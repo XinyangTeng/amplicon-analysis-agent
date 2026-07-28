@@ -33,10 +33,13 @@ def main() -> None:
                 signal = 150 if signal_group == group else 0
                 gradient = (GROUPS.index(group) * 10) if feature_index % 7 == 0 else 0
                 noise = RNG.randint(0, 35) + int(8 * math.sin(replicate + feature_index))
-                row.append(max(0, baseline + signal + gradient + noise))
+                value = max(0, baseline + signal + gradient + noise)
+                if signal_group != group and (replicate + feature_index) % 5 == 0:
+                    value = 0
+                row.append(value)
             writer.writerow(row)
 
-    ranks = ["Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "KO"]
+    ranks = ["Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "KO", "Pathway"]
     with (OUT / "taxonomy.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         writer.writerow(["FeatureID", *ranks])
@@ -45,11 +48,20 @@ def main() -> None:
                 feature, "Bacteria", f"Phylum_{(index - 1) % 6 + 1}",
                 f"Class_{(index - 1) % 10 + 1}", f"Order_{(index - 1) % 15 + 1}",
                 f"Family_{(index - 1) % 20 + 1}", f"Genus_{index}",
-                f"Species_{index}", f"K{index:05d}",
+                f"Species_{index}", f"K{index:05d}", f"Pathway_{(index - 1) % 8 + 1}",
             ])
 
-    tips = ",".join(f"{feature}:0.1" for feature in FEATURES)
-    (OUT / "tree.nwk").write_text(f"({tips});\n", encoding="utf-8")
+    def subtree(features: list[str], depth: int = 0) -> str:
+        if len(features) == 1:
+            index = FEATURES.index(features[0])
+            return f"{features[0]}:{0.03 + (index % 7) * 0.005:.3f}"
+        middle = len(features) // 2
+        left = subtree(features[:middle], depth + 1)
+        right = subtree(features[middle:], depth + 1)
+        branch = 0.02 + depth * 0.004
+        return f"({left},{right}):{branch:.3f}"
+
+    (OUT / "tree.nwk").write_text(subtree(FEATURES) + ";\n", encoding="utf-8")
     sequence = "ACGT" * 25
     (OUT / "representative_sequences.fasta").write_text(
         "".join(f">{feature}\n{sequence}\n" for feature in FEATURES), encoding="utf-8"

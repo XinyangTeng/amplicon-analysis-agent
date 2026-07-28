@@ -5,9 +5,9 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "ordinate-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: ordinate-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-rarefaction": {
     "status": "verified",
@@ -15,9 +15,9 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-microtest": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-microtest/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-barplot": {
     "status": "verified",
@@ -25,29 +25,29 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "cir-barplot-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: cir-barplot-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "cir-plot-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: cir-plot-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "clumicro-bar-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: clumicro-bar-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "cluster-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: cluster-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "distance-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: distance-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "ggflower-micro": {
     "status": "verified",
@@ -55,29 +55,29 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "ggven-upset-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: ggven-upset-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "mantal-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: mantal-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "maptree-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: maptree-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "sankey-m-group-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: sankey-m-group-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "sankey-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: sankey-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-alpha-pd": {
     "status": "verified",
@@ -85,9 +85,9 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-alpha-rarefaction": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-alpha-rarefaction/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-bagging": {
     "status": "verified",
@@ -95,14 +95,14 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-bnti": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-bnti/all_samples"
+    "notes": "Verified abundance-weighted betaNTI with phylogenetic tip-label randomization."
   },
   "script-bnti-rcbray": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-bnti-rcbray/all_samples"
+    "notes": "Verified betaNTI plus modified Raup-Crick Bray-Curtis workflow."
   },
   "script-decision-tree": {
     "status": "verified",
@@ -115,24 +115,24 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-edger": {
-    "status": "blocked",
-    "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-edger/all_samples"
-  },
-  "script-feast": {
     "status": "verified",
     "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
-  "script-function-bubble": {
-    "status": "blocked",
+  "script-feast": {
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-function-bubble/all_samples"
+    "notes": "Verified constrained nonnegative source-contribution estimator. This is a transparent local approximation and not the original FEAST algorithm."
+  },
+  "script-function-bubble": {
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Verified predicted-KO rank-based differential bubble plot."
   },
   "script-function-diff": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-function-diff/all_samples"
+    "notes": "Verified predicted-KO rank-based differential analysis."
   },
   "script-heatmap": {
     "status": "verified",
@@ -140,9 +140,9 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-kegg-enrich": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-kegg-enrich/all_samples"
+    "notes": "Verified offline KO-to-Pathway Fisher over-representation analysis."
   },
   "script-lasso": {
     "status": "verified",
@@ -160,9 +160,9 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-manhattan": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-manhattan/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-naive-bayes": {
     "status": "verified",
@@ -170,29 +170,29 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-network": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-network/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-network-properties": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-network-properties/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-network-robustness": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-network-robustness/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-network-stability": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-network-stability/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-neutral-model": {
     "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
+    "notes": "Verified self-contained Sloan neutral-community model."
   },
   "script-nnet": {
     "status": "verified",
@@ -202,17 +202,17 @@
   "script-nullmodel": {
     "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
+    "notes": "Verified group-label permutation null model for between-minus-within Bray distance."
   },
   "script-pair-microtest": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-pair-microtest/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-pca": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-pca/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-random-forest": {
     "status": "verified",
@@ -220,9 +220,9 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-rcbray": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-rcbray/all_samples"
+    "notes": "Verified modified Raup-Crick Bray-Curtis null model."
   },
   "script-rfcv": {
     "status": "verified",
@@ -235,9 +235,9 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-stamp": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-stamp/all_samples"
+    "notes": "Verified rank-based abundance-difference view with Wilcoxon tests and BH correction."
   },
   "script-svm": {
     "status": "verified",
@@ -250,24 +250,24 @@
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-venn": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-venn/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-volcano": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-volcano/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-volcano-specific": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: script-volcano-specific/all_samples"
+    "notes": "Verified rank-based volcano analysis with Wilcoxon tests and BH correction."
   },
   "ven-network-micro": {
-    "status": "blocked",
+    "status": "verified",
     "tested_on": "2026-07-28",
-    "notes": "Compatibility smoke test failed: ven-network-micro/all_samples"
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "vensuper-micro": {
     "status": "verified",
