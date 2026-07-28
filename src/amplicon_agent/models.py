@@ -37,7 +37,7 @@ class InspectionResult(BaseModel):
 
 
 class AnalysisContract(BaseModel):
-    schema_version: str = "2.0"
+    schema_version: str = "2.1"
     plan_id: str
     created_at: str = Field(default_factory=utc_now)
     files: InputFiles
@@ -45,6 +45,8 @@ class AnalysisContract(BaseModel):
     group_column: str
     batch_column: str | None = None
     gradient_column: str | None = None
+    project_design: dict[str, object] = Field(default_factory=dict)
+    analysis_scope: Literal["full", "targeted"] = "targeted"
     orientation: str
     transpose_abundance: bool
     functions: list[str]
@@ -72,3 +74,13 @@ class RunResult(BaseModel):
     report_path: str | None = None
     validation_path: str | None = None
     error: str | None = None
+
+
+class AnalysisInterpretation(BaseModel):
+    project_summary: str
+    key_findings: list[dict[str, object]] = Field(default_factory=list)
+    section_interpretations: dict[str, str] = Field(default_factory=dict)
+    supported_conclusions: list[str] = Field(default_factory=list)
+    unsupported_conclusions: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    next_steps: list[str] = Field(default_factory=list)

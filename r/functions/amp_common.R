@@ -514,6 +514,135 @@ Microheatmap.micro <- function(ps_rela, id, label = TRUE, col_cluster = TRUE, ro
   list(p1, p2, plotdata = as.data.frame(plotdata))
 }
 
+# Self-contained exploratory machine-learning adapter. It uses stratified
+# out-of-fold predictions and writes the evidence needed to audit performance.
+amp_ml_analysis <- function(ctx, method, params = list()) {
+  set.seed(param_int(params, "seed", 20260728))
+  ps <- ctx$ps
+  otu <- as(phyloseq::otu_table(ps), "matrix")
+  if (phyloseq::taxa_are_rows(ps)) otu <- t(otu)
+  otu <- sweep(otu, 1, pmax(rowSums(otu), 1), "/")
+  y <- factor(as.character(phyloseq::sample_data(ps)$Group))
+  top <- min(param_int(params, "top_n", 30), ncol(otu))
+  variance <- apply(otu, 2, stats::var)
+  keep <- names(sort(variance, decreasing = TRUE))[seq_len(top)]
+  x <- as.data.frame(otu[, keep, drop = FALSE], check.names = FALSE)
+  names(x) <- make.names(names(x), unique = TRUE)
+  k <- max(2L, min(param_int(params, "folds", 5), min(table(y))))
+  fold_id <- integer(length(y))
+  for (level in levels(y)) {
+    ids <- which(y == level)
+    fold_id[ids] <- sample(rep(seq_len(k), length.out = length(ids)))
+  }
+
+  fit_model <- function(train_x, train_y) {
+    switch(
+      method,
+      random_forest = randomForest::randomForest(x = train_x, y = train_y, importance = TRUE),
+      rfcv = randomForest::randomForest(x = train_x, y = train_y, importance = TRUE),
+      roc = randomForest::randomForest(x = train_x, y = train_y, importance = TRUE),
+      svm = e1071::svm(x = train_x, y = train_y, probability = TRUE, scale = TRUE),
+      naive_bayes = e1071::naiveBayes(x = train_x, y = train_y),
+      decision_tree = rpart::rpart(train_y ~ ., data = data.frame(train_y, train_x), method = "class"),
+      bagging = ipred::bagging(train_y ~ ., data = data.frame(train_y, train_x), nbagg = 50),
+      nnet = nnet::nnet(x = as.matrix(train_x), y = nnet::class.ind(train_y), size = min(5, ncol(train_x)),
+                        maxit = 300, trace = FALSE, decay = 0.01),
+      lda = MASS::lda(x = train_x, grouping = train_y),
+      lasso = glmnet::cv.glmnet(
+        x = as.matrix(train_x), y = train_y,
+        family = if (nlevels(train_y) == 2) "binomial" else "multinomial",
+        type.measure = "class", nfolds = max(2, min(5, min(table(train_y))))
+      ),
+      stop("Unsupported ML method: ", method)
+    )
+  }
+  predict_model <- function(model, new_x, levels_y, probability = FALSE) {
+    if (method == "nnet") {
+      raw <- predict(model, as.matrix(new_x), type = "raw")
+      if (is.null(dim(raw))) raw <- cbind(1 - raw, raw)
+      colnames(raw) <- levels_y
+      if (probability) return(raw)
+      return(factor(levels_y[max.col(raw)], levels = levels_y))
+    }
+    if (method == "lasso") {
+      type <- if (probability) "response" else "class"
+      raw <- predict(model, newx = as.matrix(new_x), s = "lambda.min", type = type)
+      if (probability) return(raw)
+      return(factor(as.character(drop(raw)), levels = levels_y))
+    }
+    if (probability && method %in% c("random_forest", "rfcv", "roc")) {
+      return(predict(model, new_x, type = "prob"))
+    }
+    factor(as.character(predict(model, new_x, type = "class")), levels = levels_y)
+  }
+
+  predicted <- factor(rep(NA_character_, length(y)), levels = levels(y))
+  probabilities <- matrix(NA_real_, nrow = length(y), ncol = nlevels(y),
+                          dimnames = list(rownames(x), levels(y)))
+  for (fold in seq_len(k)) {
+    train <- fold_id != fold
+    test <- !train
+    model <- fit_model(x[train, , drop = FALSE], droplevels(y[train]))
+    predicted[test] <- predict_model(model, x[test, , drop = FALSE], levels(y))
+    if (method %in% c("random_forest", "rfcv", "roc", "nnet", "lasso")) {
+      prob <- tryCatch(predict_model(model, x[test, , drop = FALSE], levels(y), TRUE),
+                       error = function(e) NULL)
+      if (!is.null(prob)) {
+        prob <- as.matrix(drop(prob))
+        if (nrow(prob) == sum(test) && ncol(prob) == nlevels(y)) probabilities[test, ] <- prob
+      }
+    }
+  }
+  predictions <- data.frame(
+    SampleID = phyloseq::sample_names(ps), observed = y, predicted = predicted,
+    fold = fold_id, correct = y == predicted, stringsAsFactors = FALSE
+  )
+  predictions <- cbind(predictions, as.data.frame(probabilities, check.names = FALSE))
+  confusion <- as.data.frame.matrix(table(observed = y, predicted = predicted))
+  confusion <- tibble::rownames_to_column(confusion, "observed")
+  metrics <- data.frame(
+    method = method, folds = k, samples = length(y),
+    accuracy = mean(y == predicted, na.rm = TRUE),
+    balanced_accuracy = mean(vapply(levels(y), function(level) {
+      mean(predicted[y == level] == level, na.rm = TRUE)
+    }, numeric(1))),
+    validation = "stratified out-of-fold; exploratory, not external validation",
+    stringsAsFactors = FALSE
+  )
+  full_model <- fit_model(x, y)
+  importance <- if (method %in% c("random_forest", "rfcv", "roc")) {
+    imp <- randomForest::importance(full_model)
+    data.frame(feature = rownames(imp), importance = imp[, ncol(imp)], row.names = NULL)
+  } else if (method == "decision_tree") {
+    data.frame(feature = names(full_model$variable.importance),
+               importance = as.numeric(full_model$variable.importance), row.names = NULL)
+  } else {
+    base_accuracy <- mean(predict_model(full_model, x, levels(y)) == y)
+    data.frame(feature = names(x), importance = vapply(names(x), function(feature) {
+      shuffled <- x
+      shuffled[[feature]] <- sample(shuffled[[feature]])
+      base_accuracy - mean(predict_model(full_model, shuffled, levels(y)) == y)
+    }, numeric(1)), row.names = NULL)
+  }
+  importance <- importance[order(importance$importance, decreasing = TRUE), , drop = FALSE]
+  p_conf <- ggplot2::ggplot(predictions, ggplot2::aes(observed, predicted)) +
+    ggplot2::geom_bin_2d() + ggplot2::scale_fill_viridis_c() +
+    ggplot2::labs(title = paste(method, "out-of-fold confusion"), fill = "samples") +
+    theme_nature()
+  p_imp <- ggplot2::ggplot(head(importance, 20),
+                           ggplot2::aes(stats::reorder(feature, importance), importance)) +
+    ggplot2::geom_col(fill = "#147d64") + ggplot2::coord_flip() +
+    ggplot2::labs(title = paste(method, "feature importance"), x = NULL) + theme_nature()
+  save_plot2(p_conf, ctx$out_dir, paste0(method, "_confusion"), width = 8, height = 6)
+  save_plot2(p_imp, ctx$out_dir, paste0(method, "_importance"), width = 9, height = 7)
+  write_sheet2(ctx$workbook, paste0(method, "_metrics"), metrics)
+  write_sheet2(ctx$workbook, paste0(method, "_predictions"), predictions)
+  write_sheet2(ctx$workbook, paste0(method, "_confusion"), confusion)
+  write_sheet2(ctx$workbook, paste0(method, "_importance"), importance)
+  save_amp_workbook(ctx)
+  invisible(list(metrics = metrics, predictions = predictions, importance = importance))
+}
+
 init_amp_legacy_globals <- function(ps, params = list(), env = parent.frame()) {
   meta <- data.frame(phyloseq::sample_data(ps), check.names = FALSE)
   if (!"Group" %in% colnames(meta)) {

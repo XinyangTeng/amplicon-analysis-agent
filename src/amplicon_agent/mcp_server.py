@@ -20,9 +20,18 @@ service = AgentService()
 
 @mcp.tool()
 def list_amplicon_analysis_functions(category: str | None = None) -> dict:
-    """List registered analysis functions, optionally filtered by category."""
+    """List a compact function catalog, optionally filtered by category."""
     functions = list_functions(category)
-    return {"count": len(functions), "functions": functions}
+    compact = [
+        {
+            "function_id": item["function_id"],
+            "category": item["category"],
+            "status": item["status"],
+            "minimum": item["specification"].get("minimum"),
+        }
+        for item in functions
+    ]
+    return {"count": len(compact), "functions": compact}
 
 
 @mcp.tool()
@@ -45,11 +54,13 @@ def prepare_amplicon_analysis(abundance: str, taxonomy: str, metadata: str, grou
                                top_n: int = 10, batch_column: str | None = None,
                                gradient_column: str | None = None, tree: str | None = None,
                                representative_sequences: str | None = None,
-                               function_parameters: dict[str, object] | None = None) -> dict:
+                               function_parameters: dict[str, object] | None = None,
+                               project_design: dict[str, object] | None = None,
+                               analysis_scope: str = "targeted") -> dict:
     """Create an immutable analysis contract. This does not execute analysis."""
     return service.prepare(abundance, taxonomy, metadata, group_column, functions, permutations, top_n,
                            batch_column, gradient_column, tree, representative_sequences,
-                           function_parameters)
+                           function_parameters, project_design, analysis_scope)
 
 
 @mcp.tool()
@@ -84,8 +95,14 @@ def get_analysis_report(plan_id: str) -> dict:
 
 @mcp.tool()
 def get_report_context(plan_id: str) -> dict:
-    """Return validated structured results for LLM interpretation; never use this to run analysis."""
+    """Return a compact validated context for LLM interpretation."""
     return service.report_context(plan_id)
+
+
+@mcp.tool()
+def save_analysis_interpretation(plan_id: str, interpretation: dict[str, object]) -> dict:
+    """Save project-specific interpretation after validation and rebuild the fixed HTML report."""
+    return service.save_interpretation(plan_id, interpretation)
 
 
 def main() -> None:

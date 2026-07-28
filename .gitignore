@@ -8,6 +8,8 @@ htmlcov/
 .venv/
 .amplicon-agent/
 runs/
+dependency_status.csv
+function_smoke_summary.json
 build/
 dist/
 *.egg-info/

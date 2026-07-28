@@ -11,6 +11,7 @@
 - Genus 优先、自动降级分类层级的 Top-N 群落组成；
 - 输入哈希、固定参数、一次性审批令牌、运行日志；
 - HTML 报告和机器可读 JSON；
+- 强制 Plan 模式：先询问材料与实验设计，检查文件后再次确认处理、对照和分析范围；
 - 所有文件访问限制在 `AMPLICON_WORKSPACE` 内；
 - 无有效重复时自动跳过不适用的显著性检验。
 - 支持按 `batch_column` 分层推断，避免实验批次与处理效应混杂；
@@ -19,12 +20,14 @@
 - 扩展函数在批次隔离的 phyloseq 工作区执行，输出独立日志和清单。
 - 支持可选系统发育树、代表序列和函数专属参数，全部纳入文件哈希与审批失效机制；
 - 函数执行前按批次检查样本量、分组数、树、KO及source/sink等前置条件。
-- 全部函数完成后，确定性脚本自动扫描运行目录，把所有图件按批次/结果类型导入统一 HTML；
-- 自动生成 `report_data.json` 供大模型在校验通过后解读，并生成带文件哈希的 `artifact_manifest.json`。
+- 全部函数完成后，确定性脚本自动扫描运行目录，只把 PNG 图件按批次/结果类型导入统一 HTML；PDF 仅作为下载文件，避免重复；
+- 自动生成紧凑 `report_data.json` 上下文供大模型在校验通过后解读；
+- Agent 将项目化解读写入 `interpretation.json`，固定报告生成器再合并到 HTML；生成带文件哈希的 `artifact_manifest.json`；
+- 提供 36 样本综合示例、R 依赖检查和 55 函数全量冒烟验收脚本。
 
 ## 分层架构
 
-`专家 Skill → MCP 编排与审批 → R 函数确定性计算 → 确定性校验与报告汇总 → 大模型解读`
+`强制 Plan 问询 → 文件检查与设计确认 → MCP 合同/审批 → R 确定性计算 → 校验 → 大模型项目化解读 → 固定报告重建`
 
 - 专家 Skill 解析生物学问题和实验设计、整理输入、选择合适分析并设定解释边界；
 - MCP Server 负责工具 Schema、路径安全、输入哈希、分析合同、一次性审批和执行状态；
@@ -33,6 +36,7 @@
 - 大模型只在校验通过后读取结构化摘要，负责解释，不负责计算、找文件或拼报告。
 
 详细设计见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+当前逐函数验收结果见 [`docs/VALIDATION_STATUS.md`](docs/VALIDATION_STATUS.md)。
 
 ## 目录结构
 
@@ -54,7 +58,10 @@ cd amplicon-analysis-agent
 $env:AMPLICON_WORKSPACE=(Get-Location).Path
 python -m pip install -e ".[test]"
 python -m pytest
+python scripts/generate_comprehensive_example.py
+Rscript r/check_dependencies.R dependency_status.csv
 python scripts/demo_run.py
+python scripts/smoke_test_all_functions.py
 ```
 
 使用工作区外部的 TSV 数据：
@@ -94,13 +101,13 @@ claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e
 
 ## MCP 工具
 
-`inspect_amplicon_inputs`、`prepare_amplicon_analysis`、`approve_analysis`、`run_amplicon_analysis`、`get_run_status`、`validate_amplicon_results`、`get_analysis_report`、`get_report_context`。
+`inspect_amplicon_inputs`、`prepare_amplicon_analysis`、`approve_analysis`、`run_amplicon_analysis`、`get_run_status`、`validate_amplicon_results`、`get_analysis_report`、`get_report_context`、`save_analysis_interpretation`。
 
 扩展能力查询工具：`list_amplicon_analysis_functions`、`inspect_amplicon_function`。
 
 完整的55个函数、状态、参数和前置条件见 [`docs/FUNCTION_CATALOG.md`](docs/FUNCTION_CATALOG.md)。
 
-函数兼容状态来自自动冒烟测试：31个已验证、24个条件可用、无未处理阻断函数。条件函数只有在输入和样本量要求满足时才执行；不适用批次会写入 `skipped` 和明确原因，不会伪造结果。旧 DESeq2 和组成图封装的版本冲突已有原生回退实现。
+函数兼容状态由当前环境的全量冒烟测试清单生成，而不是人工宣称。条件函数只有在输入和样本量要求满足时才执行；不适用批次会写入 `skipped` 和明确原因，不会伪造结果。运行 `python scripts/update_compatibility_from_manifest.py function_smoke_summary.json` 可同步本次验收状态。
 
 多实验数据应在检查和计划工具中同时传入 `batch_column`。剂量、时间或胁迫强度为有序数值时传入 `gradient_column`。此时分类实验在批次内部运行 Kruskal–Wallis、PERMANOVA 与离散度检验；完整数值梯度运行 Spearman Alpha 趋势和连续变量 PERMANOVA。Agent 不执行跨批次的总体显著性检验。
 

@@ -65,6 +65,6 @@ def test_all_analysis_functions_are_registered_with_compatibility_status():
     assert all("function_id" in function for function in functions)
     assert get_function("script-alpha")["status"] == "verified"
     assert get_function("script-barplot")["status"] == "verified"
-    assert get_function("script-alpha-pd")["status"] == "conditional"
+    assert get_function("script-alpha-pd")["status"] == "verified"
     assert get_function("script-alpha-pd")["specification"]["requires_tree"] is True
     assert any(item["name"] == "permutations" for item in get_function("script-bnti")["declared_parameters"])

@@ -1,17 +1,15 @@
-source(file.path(Sys.getenv("SCRIPT_DIR", "/project/yun/scripts"), "amp_common.R"), encoding = "UTF-8")
+source(file.path(Sys.getenv("SCRIPT_DIR"), "amp_common.R"), encoding = "UTF-8")
 params <- read_amp_params()
-ctx <- init_amp_context(params, "05_biomarker", "biomarker_results.xlsx")
-ps.16s <- ctx$ps
-
-res <- loadingPCA.micro(ps = ps.16s, Top = param_int(params, "top_n", 20))
-p <- res[[1]] + theme_classic()
-dat <- res[[2]]
-if ("id" %in% names(dat)) {
-  names(dat)[names(dat) == "id"] <- "ASV_ID"
-  dat <- dat[, c("ASV_ID", setdiff(names(dat), "ASV_ID")), drop = FALSE]
-}
-save_plot2(p, ctx$out_dir, "34_loadingPCA", width = 10, height = 8)
-save_preview_plot(p, width = 10, height = 8)
-write_sheet2(ctx$workbook, "34_loadingPCA_results", dat)
+ctx <- init_amp_context(params, "07_machine_learning", "machine_learning_results.xlsx")
+otu <- as(phyloseq::otu_table(ctx$ps), "matrix")
+if (phyloseq::taxa_are_rows(ctx$ps)) otu <- t(otu)
+otu <- log1p(sweep(otu, 1, pmax(rowSums(otu), 1), "/") * 1e6)
+fit <- stats::prcomp(otu, center = TRUE, scale. = TRUE)
+loadings <- data.frame(feature = rownames(fit$rotation), fit$rotation, check.names = FALSE)
+top <- head(loadings[order(abs(loadings$PC1), decreasing = TRUE), ], param_int(params, "top_n", 20))
+p <- ggplot2::ggplot(top, ggplot2::aes(stats::reorder(feature, abs(PC1)), PC1, fill = PC1 > 0)) +
+  ggplot2::geom_col(show.legend = FALSE) + ggplot2::coord_flip() +
+  ggplot2::labs(title = "PCA feature loadings", x = NULL, y = "PC1 loading") + theme_nature()
+save_plot2(p, ctx$out_dir, "loading_pca", width = 9, height = 7)
+write_sheet2(ctx$workbook, "PCA_loadings", loadings)
 save_amp_workbook(ctx)
-

@@ -12,6 +12,8 @@ def main() -> None:
     parser.add_argument("--catalog", type=Path, default=Path("r/functions/compatibility.json"))
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+    if "function_manifest" in manifest:
+        manifest = manifest["function_manifest"]
     catalog = json.loads(args.catalog.read_text(encoding="utf-8")) if args.catalog.exists() else {}
     tested_on = date.today().isoformat()
 
@@ -20,7 +22,12 @@ def main() -> None:
         statuses = {run.get("status") for run in runs.values()}
         if "failed" in statuses:
             status = "blocked"
-            notes = "Compatibility smoke test failed; inspect the function log."
+            failed = sorted(
+                f"{function_id}/{context}"
+                for context, run in runs.items()
+                if run.get("status") == "failed"
+            )
+            notes = "Compatibility smoke test failed: " + ", ".join(failed)
         elif "succeeded" in statuses:
             status = "verified"
             notes = "Completed compatibility smoke testing; input-specific prerequisites still apply."

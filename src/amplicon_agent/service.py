@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from .inputs import inspect_inputs
-from .models import AnalysisContract, ApprovalResult, RunResult
+from .models import AnalysisContract, AnalysisInterpretation, ApprovalResult, RunResult
 from .security import secure_path, sha256_file, token_hash, workspace_root
 from .store import PlanStore
 from .function_registry import get_function, function_registry, FUNCTION_ROOT
@@ -51,7 +51,9 @@ class AgentService:
                 functions: list[str] | None = None, permutations: int = 999, top_n: int = 10,
                 batch_column: str | None = None, gradient_column: str | None = None,
                 tree: str | None = None, representative_sequences: str | None = None,
-                function_parameters: dict[str, object] | None = None) -> dict:
+                function_parameters: dict[str, object] | None = None,
+                project_design: dict[str, object] | None = None,
+                analysis_scope: str = "targeted") -> dict:
         inspection = inspect_inputs(abundance, taxonomy, metadata, group_column, batch_column, gradient_column)
         if tree:
             tree_path = secure_path(tree)
@@ -66,6 +68,16 @@ class AgentService:
         registered_functions = set(function_registry())
         invalid = sorted(set(selected_functions) - baseline_functions - registered_functions)
         blockers = list(inspection.blockers)
+        design = project_design or {}
+        required_design = ("research_question", "sample_type", "treatments", "controls")
+        missing_design = [name for name in required_design if not design.get(name)]
+        if missing_design:
+            blockers.append(
+                "Project design must be confirmed before planning; missing: "
+                + ", ".join(missing_design)
+            )
+        if analysis_scope not in {"full", "targeted"}:
+            blockers.append("analysis_scope must be 'full' or 'targeted'")
         if invalid:
             blockers.append(f"Unsupported functions: {invalid}")
         for selected in selected_functions:
@@ -101,6 +113,8 @@ class AgentService:
             group_column=group_column,
             batch_column=batch_column,
             gradient_column=gradient_column,
+            project_design=design,
+            analysis_scope=analysis_scope if analysis_scope in {"full", "targeted"} else "targeted",
             orientation=inspection.orientation,
             transpose_abundance=inspection.transpose_abundance,
             functions=selected_functions,
@@ -204,10 +218,19 @@ class AgentService:
             raise ValueError("Plan has not been run")
         run_dir = secure_path(contract.run_directory)
         missing = [item for item in contract.expected_outputs if not (run_dir / item).exists()]
+        pdf_without_png = [
+            str(path.relative_to(run_dir))
+            for path in run_dir.rglob("*.pdf")
+            if not path.with_suffix(".png").exists()
+        ]
         validation_path = run_dir / "validation.json"
         domain = json.loads(validation_path.read_text(encoding="utf-8")) if validation_path.exists() else {}
-        return {"status": "pass" if not missing and domain.get("status") == "pass" else "fail",
-                "missing_outputs": missing, "domain_validation": domain}
+        return {
+            "status": "pass" if not missing and not pdf_without_png and domain.get("status") == "pass" else "fail",
+            "missing_outputs": missing,
+            "pdf_without_png": pdf_without_png,
+            "domain_validation": domain,
+        }
 
     def report(self, plan_id: str) -> dict:
         contract = self.store.load(plan_id)
@@ -233,7 +256,45 @@ class AgentService:
         if not contract.run_directory:
             raise ValueError("Plan has not been run")
         report_data_path = secure_path(Path(contract.run_directory) / "report_data.json")
-        return json.loads(report_data_path.read_text(encoding="utf-8"))
+        data = json.loads(report_data_path.read_text(encoding="utf-8"))
+        artifacts = data.get("artifacts", {})
+        compact_artifacts = {
+            "counts": artifacts.get("counts", {}),
+            "png_figures": [
+                {"path": item.get("path"), "section": item.get("section"), "context": item.get("context")}
+                for item in artifacts.get("figures", [])
+            ],
+        }
+        return {
+            "schema_version": data.get("schema_version"),
+            "contract": data.get("contract"),
+            "validation": data.get("validation"),
+            "qc_summary": data.get("qc_summary"),
+            "statistical_results": data.get("statistical_results"),
+            "function_execution": data.get("function_execution"),
+            "artifacts": compact_artifacts,
+            "interpretation": data.get("interpretation"),
+            "interpretation_policy": data.get("interpretation_policy"),
+        }
+
+    def save_interpretation(self, plan_id: str, interpretation: dict[str, object]) -> dict:
+        """Persist a validated, project-specific LLM interpretation and rebuild the fixed report."""
+        validation = self.validate(plan_id)
+        if validation["status"] != "pass":
+            raise ValueError("Results must pass validation before interpretation")
+        contract = self.store.load(plan_id)
+        if not contract.run_directory:
+            raise ValueError("Plan has not been run")
+        parsed = AnalysisInterpretation.model_validate(interpretation)
+        run_dir = secure_path(contract.run_directory)
+        path = run_dir / "interpretation.json"
+        path.write_text(parsed.model_dump_json(indent=2), encoding="utf-8")
+        report = build_analysis_report(run_dir)
+        return {
+            "plan_id": plan_id,
+            "interpretation_path": str(path),
+            "report_path": report["report_path"],
+        }
 
     @staticmethod
     def _verify_hashes(contract: AnalysisContract) -> None:

@@ -163,6 +163,11 @@ library(ggpubr)
 # 闁烩晛鐡ㄧ敮瀵糕偓鐢靛帶閸ゎ參鏁嶇仦鑲╃憹闂傚洠鍋撻悷鏇氭祰濞村棝骞?
 ggexport(p3_7, filename = file.path(amplicon_beta_path, "mantel_test.pdf"), 
          width = getOption("amp.plot_width", 10), height = getOption("amp.plot_height", 8))
+ggplot2::ggsave(
+  file.path(amplicon_beta_path, "mantel_test.png"), plot = p3_7,
+  width = getOption("amp.plot_width", 10), height = getOption("amp.plot_height", 8),
+  dpi = param_int(params, "plot_dpi", 300), limitsize = FALSE, bg = "white"
+)
 write_sheet2(amplicon_beta_wb, "mantel_results", data_m)
 openxlsx::saveWorkbook(amplicon_beta_wb ,beta_xlsx_path, overwrite = TRUE)
 
