@@ -13,8 +13,13 @@ WORKDIR /app
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 COPY r ./r
+COPY scripts/manage_access.py ./scripts/manage_access.py
 RUN Rscript r/check_dependencies.R /tmp/dependency_status.csv
 RUN python3 -m pip install --break-system-packages --no-cache-dir ".[web]"
 
 ENV AMPLICON_WORKSPACE=/workspace
+RUN useradd --create-home --uid 10001 bioagent \
+    && mkdir -p /workspace \
+    && chown -R bioagent:bioagent /workspace /app
+USER bioagent
 CMD ["amplicon-agent"]

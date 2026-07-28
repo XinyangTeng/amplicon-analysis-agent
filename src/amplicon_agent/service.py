@@ -18,6 +18,7 @@ from .store import PlanStore
 from .function_registry import get_function, function_registry, FUNCTION_ROOT
 from .function_specs import assess_context
 from .report_builder import build_analysis_report
+from .resource_limits import subprocess_limit_kwargs, subprocess_timeout_seconds
 
 
 EXPECTED_OUTPUTS = [
@@ -190,8 +191,9 @@ class AgentService:
         try:
             completed = subprocess.run(
                 command, capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=1800, check=False,
+                errors="replace", timeout=subprocess_timeout_seconds(), check=False,
                 env=r_subprocess_environment(),
+                **subprocess_limit_kwargs(),
             )
             log_path.write_text(completed.stdout + "\n--- STDERR ---\n" + completed.stderr, encoding="utf-8")
             if completed.returncode != 0:
@@ -439,7 +441,8 @@ class AgentService:
                 completed = subprocess.run(
                     [rscript, str(script)], cwd=workspace, env=env,
                     capture_output=True, text=True, encoding="utf-8", errors="replace",
-                    timeout=1800, check=False,
+                    timeout=subprocess_timeout_seconds(), check=False,
+                    **subprocess_limit_kwargs(),
                 )
                 log_name = f"{function_id}--{context_name}.log"
                 (logs / log_name).write_text(

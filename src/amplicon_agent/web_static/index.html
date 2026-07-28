@@ -4,17 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#174c3c">
-  <meta name="description" content="可审计、先计划后执行的扩增子微生物组分析 Agent">
+  <meta name="description" content="邀请制、可审计、先计划后执行的扩增子微生物组分析工作台">
+  <meta name="robots" content="noindex,nofollow">
   <title>扩增子分析 Agent</title>
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/style.css?v=4">
+  <link rel="manifest" href="/assets/manifest.webmanifest">
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/style.css?v=5">
 </head>
 <body>
   <div class="shell">
     <aside class="sidebar">
       <a class="brand" href="/" aria-label="返回首页">
-        <img src="/icon.svg" alt="">
+        <img src="/assets/icon.svg" alt="">
         <span><strong>BioAgent</strong><small>扩增子分析工作台</small></span>
       </a>
 
@@ -28,6 +29,7 @@
       <div class="sidebar-actions">
         <button id="open-model" class="button ghost wide">模型接口设置</button>
         <button id="install-app" class="button ghost wide hidden">安装为 App</button>
+        <p id="retention-state" class="sidebar-note">数据到期后自动删除</p>
         <div class="server-state"><i id="health-dot"></i><span id="health-text">正在连接服务…</span></div>
       </div>
     </aside>
@@ -39,7 +41,7 @@
           <h1>从实验设计到可解释报告</h1>
           <p>模型负责理解问题与解释结果，统计计算始终由固定函数完成。</p>
         </div>
-        <button id="token-button" class="button compact">访问令牌</button>
+        <button id="account-button" class="button compact">我的账户</button>
       </header>
 
       <div id="notice" class="notice hidden" role="status"></div>
@@ -180,7 +182,7 @@
 
       <footer>
         <span>所有统计结果均来自固定 R 函数；模型不参与数值计算。</span>
-        <a href="/api/health" target="_blank" rel="noreferrer">服务状态</a>
+        <span><a href="/privacy" target="_blank" rel="noreferrer">隐私政策</a> · <a href="/" target="_blank" rel="noreferrer">公开介绍页</a></span>
       </footer>
     </main>
   </div>
@@ -191,7 +193,7 @@
         <div><span class="kicker">MODEL API</span><h2>模型接口设置</h2></div>
         <button type="button" class="icon-button" data-close-dialog="model-dialog" aria-label="关闭">×</button>
       </div>
-      <p>模型只用于结果解读。API Key 不会返回到浏览器，也不会写入报告。</p>
+      <p>模型只用于结果解读。你可以使用站点共享额度，或填写自己的 API Key；自带密钥仅保存在本次浏览器会话，并随当前请求发送，不写入服务器配置或报告。</p>
       <div class="form-grid two">
         <label><span>提供商预设</span><select name="provider" id="model-provider"></select></label>
         <label><span>接口协议</span>
@@ -202,10 +204,9 @@
         </label>
         <label class="span-two"><span>Base URL</span><input name="base_url" id="model-base-url" required></label>
         <label class="span-two"><span>模型名称</span><input name="model" id="model-name" required></label>
-        <label class="span-two"><span>API Key（留空表示不修改）</span><input type="password" name="api_key" autocomplete="new-password" placeholder="sk-…"></label>
+        <label class="span-two"><span>自己的 API Key（可选）</span><input type="password" name="api_key" autocomplete="off" placeholder="留空则使用共享模型额度"></label>
       </div>
-      <label class="check-row"><input type="checkbox" name="persist_api_key"><span>将密钥保存到服务器配置文件；公共部署建议改用 MODEL_API_KEY 环境变量</span></label>
-      <label class="check-row"><input type="checkbox" name="clear_api_key"><span>清除服务器已保存或本次进程中的密钥</span></label>
+      <label class="check-row"><input type="checkbox" name="remember_model"><span>在当前浏览器会话中保留上述设置（关闭浏览器后自动清除）</span></label>
       <div id="model-state" class="model-state"></div>
       <div class="dialog-actions">
         <button type="button" class="button" id="test-model">测试连接</button>
@@ -214,18 +215,27 @@
     </form>
   </dialog>
 
-  <dialog id="token-dialog">
-    <form method="dialog" class="dialog-card" id="token-form">
+  <dialog id="account-dialog">
+    <form method="dialog" class="dialog-card" id="account-form">
       <div class="dialog-heading">
-        <div><span class="kicker">ACCESS</span><h2>访问令牌</h2></div>
-        <button type="button" class="icon-button" data-close-dialog="token-dialog" aria-label="关闭">×</button>
+        <div><span class="kicker">ACCOUNT</span><h2>账户与数据</h2></div>
+        <button type="button" class="icon-button" data-close-dialog="account-dialog" aria-label="关闭">×</button>
       </div>
-      <p>只有服务端设置了 <code>AMPLICON_WEB_TOKEN</code> 时才需要填写。令牌仅保存在当前浏览器会话。</p>
-      <label><span>Bearer Token</span><input type="password" name="token" autocomplete="off"></label>
-      <div class="dialog-actions"><button type="submit" class="button primary">保存并重新连接</button></div>
+      <div id="account-summary" class="account-summary"></div>
+      <p class="muted">删除数据会取消等待中的任务，并清除你的上传、计划、运行结果和模型调用记录。此操作无法撤销。</p>
+      <label><span>危险操作确认文本</span><input name="delete_confirmation" autocomplete="off" placeholder="DELETE MY DATA"></label>
+      <div class="dialog-actions split-actions">
+        <button type="button" class="button" id="logout-button">退出登录</button>
+        <button type="button" class="button danger" id="delete-data-button">删除我的全部数据</button>
+      </div>
+      <details class="advanced account-delete">
+        <summary>永久注销账户</summary>
+        <p>如需注销，请输入 <code>DELETE MY ACCOUNT</code>，账户与全部数据会一并删除。</p>
+        <button type="button" class="button danger" id="delete-account-button">永久注销账户</button>
+      </details>
     </form>
   </dialog>
 
-  <script src="/app.js?v=4" defer></script>
+  <script src="/assets/app.js?v=5" defer></script>
 </body>
 </html>

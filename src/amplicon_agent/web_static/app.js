@@ -4,6 +4,8 @@ const state = {
   plan: null,
   functions: [],
   presets: [],
+  user: null,
+  modelSettings: null,
   pollTimer: null,
   installPrompt: null,
 };
@@ -23,18 +25,23 @@ const categoryNames = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
-function authHeaders() {
-  const token = sessionStorage.getItem("ampliconWebToken");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 async function request(path, options = {}) {
-  const headers = { ...authHeaders(), ...(options.headers || {}) };
+  const method = String(options.method || "GET").toUpperCase();
+  const headers = { ...(options.headers || {}) };
+  if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+    const csrf = sessionStorage.getItem("ampliconCsrfToken");
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
   if (options.body && !(options.body instanceof FormData) && typeof options.body !== "string") {
     headers["Content-Type"] = "application/json";
     options.body = JSON.stringify(options.body);
   }
   const response = await fetch(path, { ...options, headers });
+  if (response.status === 401) {
+    sessionStorage.removeItem("ampliconCsrfToken");
+    location.href = `/login?return=${encodeURIComponent(location.pathname)}`;
+    throw new Error("登录已过期");
+  }
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`;
     try {
@@ -44,6 +51,15 @@ async function request(path, options = {}) {
     throw new Error(message);
   }
   return response;
+}
+
+async function loadMe() {
+  const user = await jsonRequest("/api/auth/me");
+  state.user = user;
+  sessionStorage.setItem("ampliconCsrfToken", user.csrf_token);
+  $("#account-button").textContent = user.display_name || "我的账户";
+  $("#retention-state").textContent = `数据保留 ${user.retention_days} 天 · 共享模型剩余 ${user.monthly_model_remaining} 次`;
+  return user;
 }
 
 async function jsonRequest(path, options = {}) {
@@ -317,20 +333,21 @@ async function approveAndRun(event) {
 }
 
 function updateRunView(contract) {
-  const status = contract.status;
+  const queueStatus = contract.job?.status;
+  const status = queueStatus === "queued" ? "queued" : contract.status;
   const badge = $("#run-status");
   const bar = $("#progress-bar");
   badge.textContent = {
-    prepared: "已准备", running: "分析运行中", succeeded: "分析完成", failed: "运行失败",
+    prepared: "已准备", queued: "任务已排队", running: "分析运行中", succeeded: "分析完成", failed: "运行失败",
   }[status] || status;
   badge.className = `status-pill ${status === "succeeded" ? "success" : status === "failed" ? "error" : "warning"}`;
-  bar.className = status === "succeeded" ? "done" : status === "running" ? "running" : "";
+  bar.className = status === "succeeded" ? "done" : ["queued", "running"].includes(status) ? "running" : "";
   $("#run-detail").classList.remove("empty");
   $("#run-detail").innerHTML = `
     <p><strong>计划编号：</strong><code>${escapeHtml(contract.plan_id)}</code></p>
     <p><strong>状态：</strong>${escapeHtml(status)}</p>
-    ${contract.run_directory ? `<p><strong>运行目录：</strong>${escapeHtml(contract.run_directory)}</p>` : ""}
-    ${contract.error ? `<ul class="message-list blockers"><li>${escapeHtml(contract.error)}</li></ul>` : ""}
+    ${queueStatus ? `<p><strong>队列状态：</strong>${escapeHtml(queueStatus)}</p>` : ""}
+    ${(contract.error || contract.job?.error) ? `<ul class="message-list blockers"><li>${escapeHtml(contract.error || contract.job.error)}</li></ul>` : ""}
   `;
   const done = status === "succeeded";
   $("#report-button").classList.toggle("hidden", !done);
@@ -378,8 +395,12 @@ async function interpretResults() {
   const button = $("#interpret-button");
   busy(button, true, "模型正在解读…");
   try {
-    await jsonRequest(`/api/plans/${state.plan.plan_id}/interpret`, { method: "POST" });
+    await jsonRequest(`/api/plans/${state.plan.plan_id}/interpret`, {
+      method: "POST",
+      body: modelPayload(),
+    });
     notify("针对当前实验设计的结果解读已写入报告。", "success");
+    await loadMe();
     await openReport();
   } catch (error) {
     notify(`模型解读失败：${error.message}`, "error");
@@ -396,13 +417,19 @@ async function loadModelSettings() {
     ]);
     state.presets = presetData.presets;
     $("#model-provider").innerHTML = state.presets.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`).join("");
-    $("#model-provider").value = config.provider;
-    $("#model-protocol").value = config.protocol;
-    $("#model-base-url").value = config.base_url;
-    $("#model-name").value = config.model;
-    $("#model-state").textContent = config.api_key_configured
-      ? `API Key 已配置（来源：${config.api_key_source}）`
-      : "尚未配置 API Key；不影响统计分析，只影响模型解读。";
+    const saved = sessionStorage.getItem("ampliconModelSettings");
+    state.modelSettings = saved ? JSON.parse(saved) : state.modelSettings;
+    const value = state.modelSettings || config.server_default;
+    $("#model-provider").value = value.provider;
+    $("#model-protocol").value = value.protocol;
+    $("#model-base-url").value = value.base_url;
+    $("#model-name").value = value.model;
+    $("#model-form").elements.api_key.value = value.api_key || "";
+    $("#model-form").elements.remember_model.checked = Boolean(saved);
+    const quota = config.quota;
+    $("#model-state").textContent = config.server_default.api_key_configured
+      ? `共享模型本月剩余 ${quota.monthly_model_remaining}/${quota.monthly_model_quota} 次；填写自己的 API Key 不占共享额度。`
+      : "共享模型尚未配置；请填写自己的 API Key。";
   } catch (error) {
     $("#model-state").textContent = error.message;
   }
@@ -416,42 +443,94 @@ function applyProviderPreset() {
   $("#model-name").value = preset.model;
 }
 
+function modelPayload(formElement = $("#model-form")) {
+  const form = new FormData(formElement);
+  const payload = {
+    provider: String(form.get("provider") || ""),
+    protocol: String(form.get("protocol") || ""),
+    base_url: String(form.get("base_url") || ""),
+    model: String(form.get("model") || ""),
+  };
+  const apiKey = String(form.get("api_key") || "").trim();
+  if (apiKey) payload.api_key = apiKey;
+  return payload;
+}
+
 async function saveModel(event) {
   event.preventDefault();
   const formElement = event.currentTarget;
-  const form = new FormData(formElement);
-  const payload = {
-    provider: form.get("provider"),
-    protocol: form.get("protocol"),
-    base_url: form.get("base_url"),
-    model: form.get("model"),
-    api_key: form.get("api_key") || null,
-    persist_api_key: form.get("persist_api_key") === "on",
-    clear_api_key: form.get("clear_api_key") === "on",
-  };
-  try {
-    const config = await jsonRequest("/api/model", { method: "PUT", body: payload });
-    $("#model-state").textContent = config.api_key_configured
-      ? `已保存；API Key 来源：${config.api_key_source}`
-      : "已保存模型地址与名称，但尚未配置 API Key。";
-    formElement.elements.api_key.value = "";
-    notify("模型接口设置已保存。", "success");
-  } catch (error) {
-    $("#model-state").textContent = `保存失败：${error.message}`;
+  const payload = modelPayload(formElement);
+  state.modelSettings = payload;
+  if (formElement.elements.remember_model.checked) {
+    sessionStorage.setItem("ampliconModelSettings", JSON.stringify(payload));
+  } else {
+    sessionStorage.removeItem("ampliconModelSettings");
   }
+  $("#model-dialog").close();
+  notify(payload.api_key ? "已使用你自己的模型密钥；仅在当前浏览器会话中保留。" : "已选择共享模型额度。", "success");
 }
 
 async function testModel() {
   const button = $("#test-model");
   busy(button, true, "正在测试…");
   try {
-    const data = await jsonRequest("/api/model/test", { method: "POST" });
+    const data = await jsonRequest("/api/model/test", {
+      method: "POST",
+      body: modelPayload(),
+    });
     $("#model-state").textContent = `连接成功：${data.reply}`;
+    await loadMe();
   } catch (error) {
     $("#model-state").textContent = `连接失败：${error.message}`;
   } finally {
     busy(button, false);
   }
+}
+
+function renderAccount() {
+  const user = state.user;
+  $("#account-summary").innerHTML = `
+    <div class="metric-grid">
+      <div class="metric"><small>账户</small><strong>${escapeHtml(user.email)}</strong></div>
+      <div class="metric"><small>数据保留期</small><strong>${escapeHtml(user.retention_days)} 天</strong></div>
+      <div class="metric"><small>共享模型额度</small><strong>${escapeHtml(user.monthly_model_remaining)} / ${escapeHtml(user.monthly_model_quota)}</strong></div>
+      <div class="metric"><small>活动任务</small><strong>${escapeHtml(user.active_jobs)}</strong></div>
+    </div>`;
+}
+
+async function logout() {
+  await jsonRequest("/api/auth/logout", { method: "POST", body: {} });
+  sessionStorage.clear();
+  location.href = "/";
+}
+
+async function deleteMyData(deleteAccount = false) {
+  const input = $("#account-form").elements.delete_confirmation;
+  const required = deleteAccount ? "DELETE MY ACCOUNT" : "DELETE MY DATA";
+  if (input.value.trim() !== required) {
+    notify(`请输入确认文本：${required}`, "error");
+    return;
+  }
+  const message = deleteAccount
+    ? "确定永久注销账户并删除全部数据吗？此操作无法撤销。"
+    : "确定删除全部上传、计划和分析结果吗？此操作无法撤销。";
+  if (!window.confirm(message)) return;
+  const path = deleteAccount ? "/api/me/account" : "/api/me/data";
+  await jsonRequest(path, {
+    method: "DELETE",
+    body: { confirmation: required },
+  });
+  sessionStorage.removeItem("ampliconModelSettings");
+  if (deleteAccount) {
+    sessionStorage.clear();
+    location.href = "/";
+    return;
+  }
+  state.uploadId = null;
+  state.plan = null;
+  $("#account-dialog").close();
+  await loadMe();
+  notify("你的上传、计划和分析结果已删除。", "success");
 }
 
 function wireEvents() {
@@ -481,18 +560,15 @@ function wireEvents() {
   $("#model-provider").addEventListener("change", applyProviderPreset);
   $("#model-form").addEventListener("submit", saveModel);
   $("#test-model").addEventListener("click", testModel);
-  $("#token-button").addEventListener("click", () => {
-    $("#token-form").elements.token.value = sessionStorage.getItem("ampliconWebToken") || "";
-    $("#token-dialog").showModal();
+  $("#account-button").addEventListener("click", async () => {
+    await loadMe();
+    renderAccount();
+    $("#account-form").elements.delete_confirmation.value = "";
+    $("#account-dialog").showModal();
   });
-  $("#token-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const value = event.currentTarget.elements.token.value.trim();
-    value ? sessionStorage.setItem("ampliconWebToken", value) : sessionStorage.removeItem("ampliconWebToken");
-    $("#token-dialog").close();
-    await loadFunctions();
-    notify("访问令牌已更新。", "success");
-  });
+  $("#logout-button").addEventListener("click", () => logout().catch((error) => notify(error.message, "error")));
+  $("#delete-data-button").addEventListener("click", () => deleteMyData(false).catch((error) => notify(error.message, "error")));
+  $("#delete-account-button").addEventListener("click", () => deleteMyData(true).catch((error) => notify(error.message, "error")));
   $("#install-app").addEventListener("click", async () => {
     if (!state.installPrompt) return;
     state.installPrompt.prompt();
@@ -510,6 +586,7 @@ window.addEventListener("beforeinstallprompt", (event) => {
 
 window.addEventListener("DOMContentLoaded", async () => {
   wireEvents();
+  await loadMe();
   await Promise.all([loadHealth(), loadFunctions()]);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 });

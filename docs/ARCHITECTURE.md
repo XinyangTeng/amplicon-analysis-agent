@@ -2,6 +2,30 @@
 
 The system deliberately separates biological judgment, deterministic execution, and language-model interpretation.
 
+The public Web surface adds an outer multi-user boundary without changing the
+scientific execution layers:
+
+```text
+Public landing page
+        |
+Invitation-only account + CSRF-protected session
+        |
+Per-user workspace and resource ownership checks
+        |
+Redis + Celery queue
+  - per-user concurrency
+  - wall-time, CPU and memory limits
+  - cancellation and expiry cleanup
+        |
+The same AgentService, R functions, validator and report builder
+```
+
+Account metadata, sessions, quotas, resource ownership and task state are stored
+in a small global SQLite database. Uploaded research data and generated results
+are never placed in that database; they remain under
+`workspace/users/<user-id>/`. The MCP-only local workflow continues to use the
+workspace root directly.
+
 ```text
 User and project files
         |

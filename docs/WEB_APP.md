@@ -1,98 +1,183 @@
-# Web 与可安装 App
+# Web、邀请制账户与可安装 App
 
-项目从 `0.3.0` 起提供 FastAPI Web 服务和 PWA 前端。PWA 与浏览器页面使用同一个后端，不复制分析逻辑：
+从 `0.4.0` 起，Web 入口分为两个表面：
+
+- `/`：公开介绍页，可被搜索引擎收录；
+- `/app`：邀请制分析工作台，未登录时跳转到 `/login`。
+
+统计分析仍复用 MCP 背后的 `AgentService` 与 R 函数，不在浏览器中复制计算逻辑。
 
 ```text
-Web/PWA
-  → 上传缓存与输入检查
-  → 实验设计确认
-  → 分析合同与一次性审批
-  → 原有 Python 服务层
-  → 固定 R 函数
-  → 自动校验与 HTML 报告
-  → 可选模型解读
+公开介绍页
+  → 邀请码注册 / 登录
+  → 用户独立工作区
+  → 文件检查
+  → 实验设计与计划
+  → 一次性审批
+  → Redis + Celery 队列
+  → 受限 R 执行
+  → 校验、报告与可选模型解读
 ```
 
-## 本地启动
+## 推荐启动方式
 
-Windows PowerShell：
-
-```powershell
-.\scripts\start_web.ps1
-```
-
-或手动运行：
-
-```powershell
-python -m pip install ".[web]"
-$env:AMPLICON_WORKSPACE=(Join-Path (Get-Location) "workspace")
-amplicon-web
-```
-
-打开 `http://127.0.0.1:8000`。在 Chrome 或 Edge 地址栏右侧选择“安装”，也可以点击页面左侧出现的“安装为 App”。安装后可作为独立窗口运行，分析仍由本机或服务器后端完成。
-
-## Docker 启动
+复制环境变量模板，至少设置一个首次邀请码：
 
 ```powershell
 Copy-Item .env.example .env
+```
+
+在 `.env` 中填写：
+
+```dotenv
+WEB_PORT=8001
+AMPLICON_BOOTSTRAP_INVITE=请替换为至少12位的高强度邀请码
+PRIVACY_CONTACT=你的联系邮箱
+```
+
+启动 Web、Redis、分析 Worker 和自动清理服务：
+
+```powershell
 docker compose up --build
 ```
 
-数据、计划、运行结果和模型配置保存到仓库的 `workspace/`，容器删除后仍保留。
+打开 `http://127.0.0.1:8001`。同一台电脑上的其他项目仍可继续使用 `127.0.0.1:8000`。
 
-## 模型接口
+首次用户注册后，建议从 `.env` 删除 `AMPLICON_BOOTSTRAP_INVITE`，以后按需单独生成邀请码：
 
-模型不是统计计算的必要条件。未配置模型时，文件检查、计划、审批、R 分析、校验和固定 HTML 报告均可使用；只有“使用当前模型解读结果”按钮不可用。
-
-配置优先级：
-
-1. `MODEL_*` 环境变量；
-2. 当前服务进程中由设置页提交的 API Key；
-3. `workspace/.amplicon-agent/model_config.json`；
-4. 内置预设。
-
-支持两种协议：
-
-- `openai`：OpenAI Chat Completions 兼容接口，适用于 OpenAI、DeepSeek、通义千问兼容模式、本地兼容网关等；
-- `anthropic`：Anthropic Messages 接口。
-
-常用环境变量：
-
-```text
-MODEL_PROVIDER=openai_compatible | deepseek | qwen | anthropic | custom
-MODEL_PROTOCOL=openai | anthropic
-MODEL_BASE_URL=https://...
-MODEL_NAME=模型名称
-MODEL_API_KEY=密钥
-MODEL_TIMEOUT_SECONDS=180
+```powershell
+docker compose exec amplicon-web python scripts/manage_access.py `
+  --workspace /workspace create-invite --uses 1 --days 14 --label internal-test
 ```
 
-页面中的 API Key 是只写字段，后端不会把密钥返回给浏览器。设置页提供两种方式：
+如果镜像中未包含 `scripts/`，也可以在已经安装项目依赖的本机执行：
 
-- 不勾选保存：只在当前服务器进程内存中使用，重启失效；
-- 勾选保存：写入工作区私有配置文件，适合个人电脑，不建议公共服务器使用。
+```powershell
+$env:PYTHONPATH="src"
+python scripts/manage_access.py --workspace ".\workspace" `
+  create-invite --uses 1 --days 14 --label internal-test
+```
 
-公共服务器推荐只通过 `MODEL_API_KEY` 环境变量注入。
+列出或撤销邀请码：
 
-## 公开测试的最低安全要求
+```powershell
+$env:PYTHONPATH="src"
+python scripts/manage_access.py --workspace ".\workspace" list-invites
+python scripts/manage_access.py --workspace ".\workspace" revoke-invite <invite-id>
+```
 
-- 设置长度足够的 `AMPLICON_WEB_TOKEN`，访问者在页面右上角输入；
-- 使用 HTTPS 反向代理，不直接暴露开发服务器；
-- 为每个测试环境使用独立 `workspace/`；
-- 限制上传大小，并定期清理 `workspace/uploads/` 和 `workspace/runs/`；
-- 不把 `.env`、模型密钥或真实受试者信息提交到 Git；
-- 当前版本是单机测试版，不提供用户账号、配额、任务队列和多租户隔离。面向不受信任公众开放前，应再增加登录、任务队列、资源限制和对象存储。
+## 本机单进程开发模式
 
-## Web API
+没有 Redis 时可以临时使用：
 
-主要接口：
+```powershell
+.\scripts\start_web.ps1 -Port 8001 -SingleProcess `
+  -BootstrapInvite "replace-with-a-long-test-code"
+```
 
-- `POST /api/uploads/inspect`：上传并检查三表，可附加树和代表序列；
-- `POST /api/plans`：基于已检查上传生成分析合同；
-- `POST /api/plans/{id}/approve`：一次性人工审批；
-- `POST /api/plans/{id}/run`：后台运行；
-- `GET /api/plans/{id}`：状态；
-- `GET /api/plans/{id}/validation`：自动校验；
-- `POST /api/plans/{id}/interpret`：调用当前模型并重建报告；
-- `GET /api/plans/{id}/report`：HTML 报告；
-- `GET/PUT /api/model`、`POST /api/model/test`：模型设置与连通测试。
+该模式只用于界面和功能开发。任务会在 Web 进程内执行，不能提供生产级 CPU、内存和并发隔离。
+
+## 账户与数据隔离
+
+- 邀请码仅保存 SHA-256 哈希，可设置有效期和使用次数；
+- 密码使用带随机盐的 `scrypt` 哈希；
+- 登录采用 `HttpOnly`、`SameSite=Lax` Cookie；
+- 所有写请求需要当前会话的 CSRF 校验；
+- 用户目录固定为 `workspace/users/<user-id>/`；
+- 上传、计划和报告接口同时检查当前用户的资源归属；
+- SQLite 只保存账户、会话、归属、任务状态和额度，不保存模型 API Key。
+
+正式 HTTPS 部署必须设置：
+
+```dotenv
+AMPLICON_COOKIE_SECURE=true
+```
+
+## 任务队列与资源限制
+
+Docker Compose 中包含：
+
+- `redis`：消息与任务结果；
+- `amplicon-web`：网页、账户和轻量文件检查；
+- `amplicon-worker`：单并发 R 分析；
+- `amplicon-cleanup`：每小时清理过期上传、计划、结果和会话。
+
+默认限制：
+
+| 项目 | 默认值 | 配置 |
+|---|---:|---|
+| 单文件上传 | 200 MB | `AMPLICON_MAX_UPLOAD_MB` |
+| 单次总上传 | 500 MB | `AMPLICON_MAX_TOTAL_UPLOAD_MB` |
+| 每用户存储 | 2048 MB | `AMPLICON_MAX_USER_STORAGE_MB` |
+| 每用户活动任务 | 1 | `AMPLICON_MAX_ACTIVE_JOBS` |
+| 分析总时长 | 3600 秒 | `AMPLICON_ANALYSIS_TIMEOUT_SECONDS` |
+| 单个 R 子进程 | 1800 秒 | `AMPLICON_R_TIMEOUT_SECONDS` |
+| Worker CPU | 2 核 | `docker-compose.yml` |
+| Worker 内存 | 6 GB | `docker-compose.yml` |
+| 数据保留 | 7 天 | `AMPLICON_RETENTION_DAYS` |
+
+Linux Worker 还会对 R 子进程设置地址空间、CPU 时间和打开文件数限制。Windows 本机进程无法提供同等级边界，因此对外测试应使用 Docker 或云端容器。
+
+## 模型额度与自带密钥
+
+统计分析和固定报告不依赖模型。模型只用于连接测试和结果解读。
+
+- 共享模型：运营者通过环境变量配置，默认每用户每月 10 次；
+- 自带密钥（BYOK）：用户在网页填写，密钥只存在当前浏览器会话和本次 HTTP 请求中，不写入数据库、日志或报告；
+- BYOK 调用不占共享额度；
+- 共享额度用完后，用户仍可使用自己的密钥；
+- 自定义模型地址默认必须是 HTTPS；生产部署建议通过 `MODEL_ALLOWED_HOSTS` 设置域名白名单。
+
+服务端共享模型：
+
+```dotenv
+MODEL_PROVIDER=qwen
+MODEL_PROTOCOL=openai
+MODEL_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+MODEL_NAME=qwen-plus
+MODEL_API_KEY=你的服务端密钥
+AMPLICON_MONTHLY_MODEL_QUOTA=10
+MODEL_ALLOWED_HOSTS=dashscope.aliyuncs.com
+```
+
+## 删除与隐私
+
+工作台“我的账户”提供：
+
+- `DELETE MY DATA`：清除上传、计划、结果和模型调用记录，保留账户；
+- `DELETE MY ACCOUNT`：注销账户并清除全部数据。
+
+删除时会请求取消排队或运行中的任务。任务本身也会在开始和结束时检查取消状态。
+
+公开隐私政策位于 `/privacy`。正式上线前必须：
+
+- 填写实际运营主体和有效联系邮箱；
+- 根据实际模型提供商补充第三方数据处理说明；
+- 由熟悉中国数据与互联网服务合规的人员审阅；
+- 不上传含直接身份标识、医疗隐私或无权处理的数据。
+
+## 搜索引擎
+
+只有介绍页和隐私政策允许收录。登录页、工作台、API 和报告均返回 `noindex`。
+
+购买域名并部署后设置：
+
+```dotenv
+PUBLIC_BASE_URL=https://你的域名
+```
+
+服务会据此生成 canonical、`robots.txt` 和 `sitemap.xml`。面向中国大陆正式部署的准备清单见 [`DEPLOYMENT_CN.md`](DEPLOYMENT_CN.md)。
+
+## 主要 Web API
+
+- `POST /api/auth/register`、`POST /api/auth/login`、`POST /api/auth/logout`；
+- `GET /api/auth/me`；
+- `DELETE /api/me/data`、`DELETE /api/me/account`；
+- `POST /api/uploads/inspect`；
+- `POST /api/plans`、`GET /api/plans`；
+- `POST /api/plans/{id}/approve`；
+- `POST /api/plans/{id}/run`；
+- `GET /api/plans/{id}`、`GET /api/plans/{id}/validation`；
+- `POST /api/plans/{id}/interpret`；
+- `GET /api/plans/{id}/report`；
+- `GET /api/model`、`POST /api/model/test`。

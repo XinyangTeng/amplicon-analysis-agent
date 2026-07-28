@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#123f34">
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/style.css?v=5">
+  <title>登录｜BioAgent</title>
+</head>
+<body class="auth-page">
+  <a class="brand auth-brand" href="/">
+    <img src="/assets/icon.svg" alt="">
+    <span><strong>BioAgent</strong><small>扩增子分析工作流</small></span>
+  </a>
+  <main class="auth-shell">
+    <section class="auth-context">
+      <p class="eyebrow">INVITATION BETA</p>
+      <h1>研究数据值得一个清晰、可追溯的分析过程</h1>
+      <p>登录后，你的上传、分析计划、运行目录和报告与其他用户隔离。数据到期自动删除，也可以随时手动清除。</p>
+      <ul>
+        <li>先检查实验设计，再决定分析范围</li>
+        <li>一次性审批后才会运行</li>
+        <li>模型只解释已校验结果，不参与统计计算</li>
+      </ul>
+    </section>
+    <section class="auth-card">
+      <div class="auth-tabs" role="tablist">
+        <button class="active" data-auth-tab="login" role="tab">登录</button>
+        <button data-auth-tab="register" role="tab">邀请码注册</button>
+      </div>
+      <div id="auth-notice" class="notice hidden" role="status"></div>
+      <form id="login-form" class="auth-form">
+        <label><span>邮箱</span><input type="email" name="email" autocomplete="email" required></label>
+        <label><span>密码</span><input type="password" name="password" autocomplete="current-password" required></label>
+        <button class="button primary wide" type="submit">登录工作台</button>
+      </form>
+      <form id="register-form" class="auth-form hidden">
+        <label><span>邮箱</span><input type="email" name="email" autocomplete="email" required></label>
+        <label><span>显示名称</span><input name="display_name" autocomplete="name" placeholder="报告与账户中显示"></label>
+        <label><span>密码</span><input type="password" name="password" autocomplete="new-password" minlength="10" placeholder="至少 10 位，同时包含字母和数字" required></label>
+        <label><span>邀请码</span><input name="invite_code" autocomplete="one-time-code" required></label>
+        <label class="check-row"><input type="checkbox" name="privacy_accepted" required><span>我已阅读并同意<a href="/privacy" target="_blank">隐私政策</a></span></label>
+        <button class="button primary wide" type="submit">注册并进入工作台</button>
+      </form>
+      <p class="auth-footnote">当前为邀请制内测。没有邀请码时，请联系项目维护者申请。</p>
+    </section>
+  </main>
+  <script src="/assets/auth.js?v=1" defer></script>
+</body>
+</html>
