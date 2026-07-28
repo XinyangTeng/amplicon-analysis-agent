@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#174c3c">
+  <meta name="description" content="邀请制、可审计、先计划后执行的扩增子微生物组分析工作台">
+  <meta name="robots" content="noindex,nofollow">
+  <title>扩增子分析 Agent</title>
+  <link rel="manifest" href="/assets/manifest.webmanifest">
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/style.css?v=5">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="返回首页">
+        <img src="/assets/icon.svg" alt="">
+        <span><strong>BioAgent</strong><small>扩增子分析工作台</small></span>
+      </a>
+
+      <nav class="steps" aria-label="分析步骤">
+        <button class="step active" data-target="upload-section"><b>1</b><span>上传并检查<small>识别三表与实验结构</small></span></button>
+        <button class="step" data-target="design-section"><b>2</b><span>确认分析计划<small>处理、参照与方法范围</small></span></button>
+        <button class="step" data-target="approval-section"><b>3</b><span>审批并运行<small>一次性确认后执行</small></span></button>
+        <button class="step" data-target="result-section"><b>4</b><span>校验与解读<small>报告、证据与模型解释</small></span></button>
+      </nav>
+
+      <div class="sidebar-actions">
+        <button id="open-model" class="button ghost wide">模型接口设置</button>
+        <button id="install-app" class="button ghost wide hidden">安装为 App</button>
+        <p id="retention-state" class="sidebar-note">数据到期后自动删除</p>
+        <div class="server-state"><i id="health-dot"></i><span id="health-text">正在连接服务…</span></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">PLAN-FIRST · AUDITABLE · REPRODUCIBLE</p>
+          <h1>从实验设计到可解释报告</h1>
+          <p>模型负责理解问题与解释结果，统计计算始终由固定函数完成。</p>
+        </div>
+        <button id="account-button" class="button compact">我的账户</button>
+      </header>
+
+      <div id="notice" class="notice hidden" role="status"></div>
+
+      <section id="upload-section" class="panel">
+        <div class="panel-heading">
+          <div><span class="kicker">STEP 01</span><h2>上传数据并自动检查</h2></div>
+          <span class="status-pill neutral">不会立即运行分析</span>
+        </div>
+        <p class="section-intro">至少提供丰度表、分类表和样本信息表。系统先识别方向、样本对应、分组重复、分类层级和阻断项。</p>
+
+        <form id="inspect-form">
+          <div class="file-grid">
+            <label class="file-card required">
+              <input type="file" name="abundance" accept=".csv,.tsv,.txt" required>
+              <span class="file-icon">01</span>
+              <strong>丰度表</strong>
+              <small>Feature × Sample，CSV/TSV/TXT</small>
+              <em data-file-label="abundance">选择文件</em>
+            </label>
+            <label class="file-card required">
+              <input type="file" name="taxonomy" accept=".csv,.tsv,.txt" required>
+              <span class="file-icon">02</span>
+              <strong>分类注释表</strong>
+              <small>第一列为 Feature ID</small>
+              <em data-file-label="taxonomy">选择文件</em>
+            </label>
+            <label class="file-card required">
+              <input type="file" name="metadata" accept=".csv,.tsv,.txt" required>
+              <span class="file-icon">03</span>
+              <strong>样本信息表</strong>
+              <small>第一列为 Sample ID</small>
+              <em data-file-label="metadata">选择文件</em>
+            </label>
+            <label class="file-card optional">
+              <input type="file" name="tree" accept=".nwk,.tree,.tre,.txt">
+              <span class="file-icon">+</span>
+              <strong>系统发育树</strong>
+              <small>可选，用于 βNTI 等分析</small>
+              <em data-file-label="tree">选择文件</em>
+            </label>
+            <label class="file-card optional">
+              <input type="file" name="representative_sequences" accept=".fasta,.fa,.fna">
+              <span class="file-icon">+</span>
+              <strong>代表序列</strong>
+              <small>可选，FASTA 格式</small>
+              <em data-file-label="representative_sequences">选择文件</em>
+            </label>
+          </div>
+
+          <div class="form-grid three">
+            <label><span>分组列 <b>*</b></span><input name="group_column" value="Group" required></label>
+            <label><span>批次列</span><input name="batch_column" placeholder="如 Site；没有则留空"></label>
+            <label><span>梯度列</span><input name="gradient_column" placeholder="如 StressLevel；没有则留空"></label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="button primary" id="inspect-button">检查文件与实验结构</button>
+            <span class="muted">单文件默认上限 200 MB，可通过环境变量调整</span>
+          </div>
+        </form>
+
+        <div id="inspection-result" class="result-box hidden"></div>
+      </section>
+
+      <section id="design-section" class="panel locked">
+        <div class="panel-heading">
+          <div><span class="kicker">STEP 02</span><h2>确认实验设计与分析范围</h2></div>
+          <span id="design-lock" class="status-pill neutral">等待文件检查</span>
+        </div>
+        <p class="section-intro">这部分是专家判断的入口。没有传统空白对照时，请指定一个科学合理的“参照组”，并在设计说明中写明原因。</p>
+
+        <form id="plan-form">
+          <div class="form-grid two">
+            <label class="span-two"><span>研究问题 <b>*</b></span><textarea name="research_question" rows="3" placeholder="例如：玉米根际微生物在不同非生物胁迫下是否存在共同响应？" required></textarea></label>
+            <label><span>样本类型 <b>*</b></span><input name="sample_type" placeholder="例如：玉米根际土" required></label>
+            <label><span>分析范围</span>
+              <select name="analysis_scope">
+                <option value="targeted">针对问题选择分析</option>
+                <option value="full">运行所有满足条件的分析</option>
+              </select>
+            </label>
+            <label><span>对照/参照组 <b>*</b></span><input name="controls" placeholder="多个组用逗号分隔" required></label>
+            <label><span>处理组 <b>*</b></span><input name="treatments" placeholder="多个组用逗号分隔" required></label>
+            <label class="span-two"><span>实验设计补充</span><textarea name="design_notes" rows="2" placeholder="例如：养分胁迫 1 最严重、7 最轻；没有未处理对照，以最轻胁迫作为参照。"></textarea></label>
+          </div>
+
+          <div class="analysis-toolbar">
+            <div>
+              <h3>分析模块</h3>
+              <p>QC、Alpha、Beta、组成分析固定包含；下方选择扩展函数。</p>
+            </div>
+            <div class="button-group">
+              <button type="button" class="button compact" id="preset-targeted">仅基础模块</button>
+              <button type="button" class="button compact" id="preset-full">全选已验证函数</button>
+            </div>
+          </div>
+          <div id="function-list" class="function-list"><p class="muted">正在读取函数目录…</p></div>
+
+          <details class="advanced">
+            <summary>高级参数</summary>
+            <div class="form-grid three">
+              <label><span>置换次数</span><input type="number" name="permutations" min="9" max="9999" value="999"></label>
+              <label><span>组成 Top N</span><input type="number" name="top_n" min="1" max="50" value="10"></label>
+              <label><span>函数参数 JSON</span><input name="function_parameters" value="{}"></label>
+            </div>
+          </details>
+
+          <div class="form-actions">
+            <button type="submit" class="button primary" id="plan-button">生成可审计分析计划</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="approval-section" class="panel locked">
+        <div class="panel-heading">
+          <div><span class="kicker">STEP 03</span><h2>核对计划并一次性审批</h2></div>
+          <span id="approval-lock" class="status-pill neutral">等待生成计划</span>
+        </div>
+        <div id="contract-view" class="contract-view empty">计划生成后会在这里显示输入摘要、函数列表、参数、警告和阻断项。</div>
+        <form id="approval-form" class="approval-box hidden">
+          <label><span>输入上方显示的确认文本</span><input name="confirmation" autocomplete="off" required></label>
+          <button class="button danger" type="submit">确认并开始分析</button>
+        </form>
+      </section>
+
+      <section id="result-section" class="panel locked">
+        <div class="panel-heading">
+          <div><span class="kicker">STEP 04</span><h2>运行、校验与模型解读</h2></div>
+          <span id="run-status" class="status-pill neutral">尚未运行</span>
+        </div>
+        <div class="progress-track"><span id="progress-bar"></span></div>
+        <div id="run-detail" class="run-detail empty">分析运行后，这里会显示状态与报告入口。</div>
+        <div class="form-actions">
+          <button id="interpret-button" class="button primary hidden" type="button">使用当前模型解读结果</button>
+          <button id="report-button" class="button hidden" type="button">打开 HTML 报告</button>
+        </div>
+      </section>
+
+      <footer>
+        <span>所有统计结果均来自固定 R 函数；模型不参与数值计算。</span>
+        <span><a href="/privacy" target="_blank" rel="noreferrer">隐私政策</a> · <a href="/" target="_blank" rel="noreferrer">公开介绍页</a></span>
+      </footer>
+    </main>
+  </div>
+
+  <dialog id="model-dialog">
+    <form method="dialog" class="dialog-card" id="model-form">
+      <div class="dialog-heading">
+        <div><span class="kicker">MODEL API</span><h2>模型接口设置</h2></div>
+        <button type="button" class="icon-button" data-close-dialog="model-dialog" aria-label="关闭">×</button>
+      </div>
+      <p>模型只用于结果解读。你可以使用站点共享额度，或填写自己的 API Key；自带密钥仅保存在本次浏览器会话，并随当前请求发送，不写入服务器配置或报告。</p>
+      <div class="form-grid two">
+        <label><span>提供商预设</span><select name="provider" id="model-provider"></select></label>
+        <label><span>接口协议</span>
+          <select name="protocol" id="model-protocol">
+            <option value="openai">OpenAI Chat Completions</option>
+            <option value="anthropic">Anthropic Messages</option>
+          </select>
+        </label>
+        <label class="span-two"><span>Base URL</span><input name="base_url" id="model-base-url" required></label>
+        <label class="span-two"><span>模型名称</span><input name="model" id="model-name" required></label>
+        <label class="span-two"><span>自己的 API Key（可选）</span><input type="password" name="api_key" autocomplete="off" placeholder="留空则使用共享模型额度"></label>
+      </div>
+      <label class="check-row"><input type="checkbox" name="remember_model"><span>在当前浏览器会话中保留上述设置（关闭浏览器后自动清除）</span></label>
+      <div id="model-state" class="model-state"></div>
+      <div class="dialog-actions">
+        <button type="button" class="button" id="test-model">测试连接</button>
+        <button type="submit" class="button primary" value="default">保存设置</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="account-dialog">
+    <form method="dialog" class="dialog-card" id="account-form">
+      <div class="dialog-heading">
+        <div><span class="kicker">ACCOUNT</span><h2>账户与数据</h2></div>
+        <button type="button" class="icon-button" data-close-dialog="account-dialog" aria-label="关闭">×</button>
+      </div>
+      <div id="account-summary" class="account-summary"></div>
+      <p class="muted">删除数据会取消等待中的任务，并清除你的上传、计划、运行结果和模型调用记录。此操作无法撤销。</p>
+      <label><span>危险操作确认文本</span><input name="delete_confirmation" autocomplete="off" placeholder="DELETE MY DATA"></label>
+      <div class="dialog-actions split-actions">
+        <button type="button" class="button" id="logout-button">退出登录</button>
+        <button type="button" class="button danger" id="delete-data-button">删除我的全部数据</button>
+      </div>
+      <details class="advanced account-delete">
+        <summary>永久注销账户</summary>
+        <p>如需注销，请输入 <code>DELETE MY ACCOUNT</code>，账户与全部数据会一并删除。</p>
+        <button type="button" class="button danger" id="delete-account-button">永久注销账户</button>
+      </details>
+    </form>
+  </dialog>
+
+  <script src="/assets/app.js?v=5" defer></script>
+</body>
+</html>

@@ -1,5 +1,25 @@
 # Amplicon Analysis Agent
 
+## Web / App 测试入口
+
+项目现同时提供 MCP Server 和图形化 Web/PWA。Web 端提供可公开收录的介绍页，以及邀请制、多用户隔离的分析工作台；统计计算仍复用同一套计划、审批、R 执行、校验和报告服务。
+
+本机单进程开发预览：
+
+```powershell
+.\scripts\start_web.ps1 -Port 8001 -SingleProcess `
+  -BootstrapInvite "replace-with-a-long-test-code"
+```
+
+Docker 一键启动：
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+打开 `http://127.0.0.1:8001`。公开介绍页位于 `/`，分析入口位于 `/app`。正式多用户测试应使用 Docker Compose，它会同时启动 Redis、Celery 分析 Worker 和自动清理服务。模型接口支持共享额度与用户自带 API Key；没有模型 API 也可以完成统计分析和固定报告。完整说明见 [`docs/WEB_APP.md`](docs/WEB_APP.md)。
+
 面向 Claude Code 的可审计扩增子微生物组 MCP Server。首版从 ASV 丰度表、分类表和样本信息表开始，完成输入诊断、分析计划、一次性审批、R 分析、结果校验和 HTML 报告。
 
 项目级专家 Skill 已放在 `.claude/skills/amplicon-analysis/`，从仓库目录启动 Claude Code 时会自动发现；MCP Server 负责真正的文件检查、审批和分析执行。
@@ -24,6 +44,10 @@
 - 自动生成紧凑 `report_data.json` 上下文供大模型在校验通过后解读；
 - Agent 将项目化解读写入 `interpretation.json`，固定报告生成器再合并到 HTML；生成带文件哈希的 `artifact_manifest.json`；
 - 提供 36 样本综合示例、R 依赖检查和 55 函数全量冒烟验收脚本。
+- 公开介绍页与邀请制账户；用户目录、计划和报告相互隔离；
+- Redis + Celery 任务队列，限制并发、CPU、内存、运行时间、上传和个人存储；
+- 共享模型月度额度与 BYOK；API Key 不写入服务器；
+- 到期自动删除、手动删除全部数据、账户注销和公开隐私政策。
 
 ## 分层架构
 
@@ -43,6 +67,7 @@
 ```text
 .claude/skills/amplicon-analysis/  专家工作流与函数选择规范
 src/amplicon_agent/                MCP、合同、审批、校验和报告代码
+src/amplicon_agent/web_static/     公开介绍页、登录页和分析工作台
 r/run_analysis.R                   基础分析执行器
 r/functions/                       注册的 R 分析函数与共享输入适配器
 scripts/                           示例运行、报告重建和目录生成脚本
@@ -78,14 +103,14 @@ python scripts/demo_run.py --workspace "E:\桌面\生信agent" `
 ## Docker 与 Claude Code
 
 ```powershell
-docker build -t amplicon-analysis-agent:0.2.0 .
-docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.2.0
+docker build -t amplicon-analysis-agent:0.4.0 .
+docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.4.0
 ```
 
 构建镜像后，可复制 `.mcp.json.example` 为 `.mcp.json`，或执行：
 
 ```powershell
-claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.2.0
+claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.4.0
 ```
 
 建议提示词：
