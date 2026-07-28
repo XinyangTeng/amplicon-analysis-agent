@@ -1,5 +1,24 @@
 # Amplicon Analysis Agent
 
+## Web / App 测试入口
+
+项目现同时提供 MCP Server 和图形化 Web/PWA。Web 端复用同一套计划、审批、R 执行、校验和报告服务，不在浏览器中复制统计逻辑。
+
+Windows 一键启动：
+
+```powershell
+.\scripts\start_web.ps1
+```
+
+Docker 一键启动：
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+打开 `http://127.0.0.1:8000`。Chrome/Edge 可将页面安装成独立 App。模型接口在页面“模型接口设置”中修改，支持 OpenAI Chat Completions 兼容协议和 Anthropic Messages 协议；没有模型 API 也可以完成统计分析和固定报告。完整说明见 [`docs/WEB_APP.md`](docs/WEB_APP.md)。
+
 面向 Claude Code 的可审计扩增子微生物组 MCP Server。首版从 ASV 丰度表、分类表和样本信息表开始，完成输入诊断、分析计划、一次性审批、R 分析、结果校验和 HTML 报告。
 
 项目级专家 Skill 已放在 `.claude/skills/amplicon-analysis/`，从仓库目录启动 Claude Code 时会自动发现；MCP Server 负责真正的文件检查、审批和分析执行。
@@ -78,14 +97,14 @@ python scripts/demo_run.py --workspace "E:\桌面\生信agent" `
 ## Docker 与 Claude Code
 
 ```powershell
-docker build -t amplicon-analysis-agent:0.2.0 .
-docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.2.0
+docker build -t amplicon-analysis-agent:0.3.0 .
+docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.3.0
 ```
 
 构建镜像后，可复制 `.mcp.json.example` 为 `.mcp.json`，或执行：
 
 ```powershell
-claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.2.0
+claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.3.0
 ```
 
 建议提示词：

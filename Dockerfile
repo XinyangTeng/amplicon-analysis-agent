@@ -14,7 +14,7 @@ COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 COPY r ./r
 RUN Rscript r/check_dependencies.R /tmp/dependency_status.csv
-RUN python3 -m pip install --break-system-packages --no-cache-dir .
+RUN python3 -m pip install --break-system-packages --no-cache-dir ".[web]"
 
 ENV AMPLICON_WORKSPACE=/workspace
-ENTRYPOINT ["amplicon-agent"]
+CMD ["amplicon-agent"]
