@@ -1,277 +1,277 @@
 {
   "script-alpha": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "ordinate-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-rarefaction": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-microtest": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-barplot": {
     "status": "verified",
-    "tested_on": "2026-07-23",
-    "notes": "Native phyloseq composition fallback passed after the legacy wrapper failed with current dplyr semantics."
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "cir-barplot-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "cir-plot-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "clumicro-bar-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "cluster-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "distance-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "ggflower-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "ggven-upset-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "mantal-micro": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "network analysis requires at least ten samples in the batch"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "maptree-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "sankey-m-group-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "sankey-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-alpha-pd": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "phylogenetic tree is required"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-alpha-rarefaction": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-bagging": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "machine learning requires at least ten samples per group"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-bnti": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "phylogenetic tree is required"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Verified abundance-weighted betaNTI with phylogenetic tip-label randomization."
   },
   "script-bnti-rcbray": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "phylogenetic tree is required"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Verified betaNTI plus modified Raup-Crick Bray-Curtis workflow."
   },
   "script-decision-tree": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "machine learning requires at least ten samples per group"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-deseq2": {
     "status": "verified",
-    "tested_on": "2026-07-23",
-    "notes": "Native DESeq2 dispersion fallback passed after the legacy wrapper failed on low-dispersion demo data."
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-edger": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-feast": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "source and sink groups must be configured"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Verified constrained nonnegative source-contribution estimator. This is a transparent local approximation and not the original FEAST algorithm."
   },
   "script-function-bubble": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "KO annotation is required"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Verified predicted-KO rank-based differential bubble plot."
   },
   "script-function-diff": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "KO annotation is required"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Verified predicted-KO rank-based differential analysis."
   },
   "script-heatmap": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-kegg-enrich": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "KO annotation is required"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Verified offline KO-to-Pathway Fisher over-representation analysis."
   },
   "script-lasso": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "machine learning requires at least ten samples per group"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-lda": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "machine learning requires at least ten samples per group"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-loading-pca": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-manhattan": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-naive-bayes": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "machine learning requires at least ten samples per group"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-network": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "network analysis requires at least ten samples in the batch"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-network-properties": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "network analysis requires at least ten samples in the batch"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-network-robustness": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "network analysis requires at least ten samples in the batch"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-network-stability": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "network analysis requires at least ten samples in the batch"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-neutral-model": {
     "status": "verified",
-    "tested_on": "2026-07-23",
-    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
+    "tested_on": "2026-07-28",
+    "notes": "Verified self-contained Sloan neutral-community model."
   },
   "script-nnet": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "machine learning requires at least ten samples per group"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-nullmodel": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "Requires a compatible nullModel implementation in the R runtime."
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Verified group-label permutation null model for between-minus-within Bray distance."
   },
   "script-pair-microtest": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-pca": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-random-forest": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "machine learning requires at least ten samples per group"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-rcbray": {
     "status": "verified",
-    "tested_on": "2026-07-23",
-    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
+    "tested_on": "2026-07-28",
+    "notes": "Verified modified Raup-Crick Bray-Curtis null model."
   },
   "script-rfcv": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "machine learning requires at least ten samples per group"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-roc": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "machine learning requires at least ten samples per group"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-stamp": {
     "status": "verified",
-    "tested_on": "2026-07-23",
-    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
+    "tested_on": "2026-07-28",
+    "notes": "Verified rank-based abundance-difference view with Wilcoxon tests and BH correction."
   },
   "script-svm": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "machine learning requires at least ten samples per group"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-ternary": {
-    "status": "conditional",
-    "tested_on": "2026-07-23",
-    "notes": "ternary analysis requires at least three groups"
+    "status": "verified",
+    "tested_on": "2026-07-28",
+    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-venn": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-volcano": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "script-volcano-specific": {
     "status": "verified",
-    "tested_on": "2026-07-23",
-    "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
+    "tested_on": "2026-07-28",
+    "notes": "Verified rank-based volcano analysis with Wilcoxon tests and BH correction."
   },
   "ven-network-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   },
   "vensuper-micro": {
     "status": "verified",
-    "tested_on": "2026-07-23",
+    "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
   }
 }

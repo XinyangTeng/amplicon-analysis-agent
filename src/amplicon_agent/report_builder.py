@@ -12,7 +12,7 @@ from urllib.parse import quote
 
 
 REPORT_FILES = {"report.html", "report_data.json", "artifact_manifest.json"}
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+IMAGE_EXTENSIONS = {".png"}
 TABLE_EXTENSIONS = {".csv", ".tsv", ".txt", ".xlsx", ".xls", ".json"}
 LOG_EXTENSIONS = {".log"}
 SECTION_LABELS = {
@@ -188,6 +188,8 @@ def _contract_summary(contract: object) -> dict[str, object]:
         "group_column": contract.get("group_column"),
         "batch_column": contract.get("batch_column"),
         "gradient_column": contract.get("gradient_column"),
+        "project_design": contract.get("project_design", {}),
+        "analysis_scope": contract.get("analysis_scope", "targeted"),
         "functions": contract.get("functions", []),
         "parameters": contract.get("parameters", {}),
         "warnings": contract.get("warnings", []),
@@ -352,6 +354,48 @@ def _figures_html(figures: list[dict[str, object]]) -> str:
     return "".join(sections)
 
 
+def _interpretation_html(value: object) -> str:
+    if not isinstance(value, dict) or not value:
+        return (
+            "<p class='warn'>结果已由固定脚本生成；项目化解读尚未写入。"
+            "Agent 应在校验通过后，依据已确认的实验设计写入结构化解读。</p>"
+        )
+    findings = value.get("key_findings", [])
+    finding_html = []
+    if isinstance(findings, list):
+        for item in findings:
+            if not isinstance(item, dict):
+                continue
+            finding_html.append(
+                "<article class='batch'>"
+                f"<h3>{html.escape(str(item.get('title', '关键发现')))}</h3>"
+                f"<p><b>证据：</b>{html.escape(str(item.get('evidence', '')))}</p>"
+                f"<p><b>解释：</b>{html.escape(str(item.get('interpretation', '')))}</p>"
+                f"<p><b>置信与边界：</b>{html.escape(str(item.get('confidence', '')))}；"
+                f"{html.escape(str(item.get('limitations', '')))}</p></article>"
+            )
+    sections = value.get("section_interpretations", {})
+    section_html = ""
+    if isinstance(sections, dict):
+        section_html = "".join(
+            f"<h3>{html.escape(str(name))}</h3><p>{html.escape(str(text))}</p>"
+            for name, text in sections.items()
+        )
+    def bullets(key: str) -> str:
+        items = value.get(key, [])
+        return "".join(f"<li>{html.escape(str(item))}</li>" for item in items) if isinstance(items, list) else ""
+    return (
+        f"<p>{html.escape(str(value.get('project_summary', '')))}</p>"
+        f"{''.join(finding_html)}{section_html}"
+        "<div class='boundary'><div class='can'><h3>本项目可以支持</h3><ul>"
+        f"{bullets('supported_conclusions')}</ul></div>"
+        "<div class='cannot'><h3>本项目不能直接支持</h3><ul>"
+        f"{bullets('unsupported_conclusions')}</ul></div></div>"
+        f"<h3>局限性</h3><ul>{bullets('limitations')}</ul>"
+        f"<h3>建议下一步</h3><ul>{bullets('next_steps')}</ul>"
+    )
+
+
 def _downloads_html(artifacts: list[dict[str, object]]) -> str:
     grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
     for item in artifacts:
@@ -390,6 +434,7 @@ def _render_html(data: dict[str, object]) -> str:
     warning_html = "".join(f"<li>{html.escape(str(item))}</li>" for item in warnings) or "<li>无</li>"
     plan_id = html.escape(str(contract.get("plan_id", "unknown"))) if isinstance(contract, dict) else "unknown"
     functions = contract.get("functions", []) if isinstance(contract, dict) else []
+    project_design = contract.get("project_design", {}) if isinstance(contract, dict) else {}
     qc_cards = ""
     if isinstance(qc, dict) and qc:
         depth = qc.get("sequencing_depth", {})
@@ -436,7 +481,7 @@ a{{color:#087443}} details{{border-top:1px solid var(--line);padding:10px 0}} su
 </head>
 <body><main>
 <header>
-  <span class="tag">确定性脚本自动生成 · 未使用大模型撰写结果</span>
+  <span class="tag">确定性结果汇总 + 经校验的项目化解读</span>
   <h1>扩增子微生物组分析报告</h1>
   <p>Plan ID：<code>{plan_id}</code></p>
   <p>生成时间：{generated}</p>
@@ -447,6 +492,10 @@ a{{color:#087443}} details{{border-top:1px solid var(--line);padding:10px 0}} su
   批次列：<code>{html.escape(str(contract.get("batch_column")))}</code>；
   梯度列：<code>{html.escape(str(contract.get("gradient_column")))}</code>。</p>
   <p>执行函数：{html.escape("、".join(map(str, functions)))}</p>
+  <p>研究问题：{html.escape(str(project_design.get("research_question", "未记录")))}</p>
+  <p>对照：{html.escape(str(project_design.get("controls", "未记录")))}；
+  处理：{html.escape(str(project_design.get("treatments", "未记录")))}；
+  分析范围：<code>{html.escape(str(contract.get("analysis_scope", "targeted")))}</code>。</p>
   <h3>输入警告</h3><ul>{warning_html}</ul>
 </section>
 <section class="panel"><h2>2. 自动合理性校验</h2>{_validation_html(validation)}</section>
@@ -455,11 +504,14 @@ a{{color:#087443}} details{{border-top:1px solid var(--line);padding:10px 0}} su
   {_stratified_html(data.get("statistical_results", {}).get("stratified_tests", {}))}
 </section>
 <section class="panel"><h2>4. 扩展分析函数执行状态</h2>{_function_html(function_execution)}</section>
-<section class="panel"><h2>5. 全部分析图件</h2>
-  <p>报告生成器递归扫描运行目录并按批次和结果目录自动分组；新增函数图件无需手工修改报告模板。</p>
+<section class="panel"><h2>5. 项目化结果解读</h2>
+  {_interpretation_html(data.get("interpretation"))}
+</section>
+<section class="panel"><h2>6. 全部分析图件（仅 PNG）</h2>
+  <p>报告只嵌入 PNG，PDF 保留为下载文件，不重复展示同一图的其他格式。</p>
   {_figures_html(figures)}
 </section>
-<section class="panel"><h2>6. 结论边界</h2>
+<section class="panel"><h2>7. 通用结论边界</h2>
   <div class="boundary"><div class="can"><h3>可以支持</h3><ul>
   <li>经过校验的数据概况、描述性模式和相应设计范围内的统计差异。</li>
   <li>同时结合效应量、p 值、样本量与离散度检验的谨慎结论。</li>
@@ -468,7 +520,7 @@ a{{color:#087443}} details{{border-top:1px solid var(--line);padding:10px 0}} su
   <li>不能把不同实验批次直接合并为同一个处理效应。</li>
   </ul></div></div>
 </section>
-<section class="panel"><h2>7. 文件索引</h2>
+<section class="panel"><h2>8. 文件索引</h2>
   <p>共扫描 {len(all_artifacts)} 个产物；完整哈希清单见 {_link("artifact_manifest.json")}，
   供 Agent 解读的结构化摘要见 {_link("report_data.json")}。</p>
   {_downloads_html(all_artifacts)}
@@ -489,6 +541,7 @@ def build_analysis_report(run_directory: str | Path) -> dict[str, object]:
     beta_tests = _load_json(run_dir / "tables" / "beta_tests.json", {})
     stratified_tests = _load_json(run_dir / "tables" / "stratified_tests.json", {})
     function_manifest = _load_json(run_dir / "functions" / "function_manifest.json", {})
+    interpretation = _load_json(run_dir / "interpretation.json", {})
     artifacts = _inventory(run_dir)
     kinds = Counter(str(item["kind"]) for item in artifacts)
     figures = [item for item in artifacts if item["kind"] == "figure"]
@@ -511,6 +564,7 @@ def build_analysis_report(run_directory: str | Path) -> dict[str, object]:
             "stratified_tests": stratified_tests,
         },
         "function_execution": _function_summary(function_manifest),
+        "interpretation": interpretation,
         "artifacts": {
             "counts": dict(sorted(kinds.items())),
             "figures": figures,

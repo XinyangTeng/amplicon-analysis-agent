@@ -24,7 +24,14 @@ os.environ["AMPLICON_WORKSPACE"] = str((args.workspace or root).resolve())
 service = AgentService()
 contract = service.prepare(
     args.abundance, args.taxonomy, args.metadata, args.group_column,
-    functions=args.functions, batch_column=args.batch_column, gradient_column=args.gradient_column
+    functions=args.functions, batch_column=args.batch_column, gradient_column=args.gradient_column,
+    project_design={
+        "research_question": "Local execution demonstration",
+        "sample_type": "example",
+        "experimental_unit": "sample",
+        "controls": ["Control"],
+        "treatments": ["Treatment"],
+    },
 )
 print(json.dumps(contract, ensure_ascii=False, indent=2))
 if contract["blockers"]:

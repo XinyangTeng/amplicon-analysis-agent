@@ -24,7 +24,7 @@ res <- tryCatch(
     sample_table <- data.frame(phyloseq::sample_data(ps_use), check.names = FALSE)
     sample_table$Group <- factor(sample_table$Group)
     dds <- DESeqDataSetFromMatrix(countData = count_matrix, colData = sample_table, design = ~ Group)
-    dds <- estimateSizeFactors(dds)
+    dds <- estimateSizeFactors(dds, type = "poscounts")
     dds <- tryCatch(
       estimateDispersions(dds, quiet = TRUE),
       error = function(e) {
@@ -58,6 +58,6 @@ dat <- res[[2]]
 
 save_plot2(p, ctx$out_dir, "26_DESeq2_plot1", width = 10, height = 8)
 save_preview_plot(p, width = 10, height = 8)
-write_sheet2(ctx$workbook, "26_DESeq2_results", dat)
+amp_save_table(ctx, "26_DESeq2_results", dat, "DESeq2_results.csv")
 save_amp_workbook(ctx)
 

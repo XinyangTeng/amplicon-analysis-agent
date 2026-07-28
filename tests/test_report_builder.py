@@ -39,6 +39,8 @@ def test_report_builder_scans_new_function_outputs(tmp_path):
             "group_column": "Group",
             "batch_column": "Batch",
             "gradient_column": None,
+            "project_design": {"research_question": "demo", "controls": ["A"], "treatments": ["B"]},
+            "analysis_scope": "targeted",
             "functions": ["qc", "script-network"],
             "parameters": {"seed": 1},
             "warnings": [],

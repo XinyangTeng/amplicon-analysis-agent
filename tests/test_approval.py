@@ -15,7 +15,10 @@ def prepare(monkeypatch, tmp_path):
     for name in ("abundance.csv", "taxonomy.csv", "metadata.csv"):
         (input_dir / name).write_bytes((DEMO / name).read_bytes())
     service = AgentService()
-    contract = service.prepare("input/abundance.csv", "input/taxonomy.csv", "input/metadata.csv", "Group")
+    contract = service.prepare(
+        "input/abundance.csv", "input/taxonomy.csv", "input/metadata.csv", "Group",
+        project_design={"research_question": "demo", "sample_type": "soil", "treatments": ["B"], "controls": ["A"]},
+    )
     return service, contract
 
 
@@ -50,7 +53,8 @@ def test_prepare_uses_direct_function_ids(monkeypatch, tmp_path):
         "input/metadata.csv",
         "Group",
         functions=["qc", "script-alpha"],
+        project_design={"research_question": "demo", "sample_type": "soil", "treatments": ["B"], "controls": ["A"]},
     )
-    assert contract["schema_version"] == "2.0"
+    assert contract["schema_version"] == "2.1"
     assert contract["functions"] == ["qc", "script-alpha"]
     assert "functions/function_manifest.json" in contract["expected_outputs"]

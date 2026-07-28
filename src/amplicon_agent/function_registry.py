@@ -13,13 +13,13 @@ FUNCTION_ROOT = Path(__file__).resolve().parents[2] / "r" / "functions"
 def _category(name: str) -> str:
     rules = [
         (("alpha", "rarefaction"), "alpha_diversity"),
-        (("ordinate", "pca", "microtest", "distance", "cluster"), "beta_diversity"),
-        (("barplot", "heatmap", "sankey", "ternary", "flower", "venn", "Ven", "cir_"), "composition"),
-        (("deseq2", "edger", "volcano", "stamp", "manhattan", "function_diff"), "differential_abundance"),
+        (("ordinate", "pca", "microtest", "distance", "cluster", "mantal", "mantel"), "beta_diversity"),
+        (("barplot", "heatmap", "sankey", "ternary", "flower", "venn", "Ven", "cir_", "clumicro", "maptree"), "composition"),
+        (("deseq2", "edger", "volcano", "stamp", "manhattan"), "differential_abundance"),
         (("random_forest", "rfcv", "svm", "lasso", "decision_tree", "naive_bayes", "bagging", "nnet", "lda", "roc", "loading_pca"), "biomarker_ml"),
-        (("network", "mantal"), "network"),
+        (("network",), "network"),
         (("bnti", "rcbray", "neutral", "nullmodel", "feast"), "community_assembly"),
-        (("kegg", "function_bubble"), "functional_prediction"),
+        (("kegg", "function_bubble", "function_diff"), "functional_prediction"),
     ]
     for needles, category in rules:
         if any(item.lower() in name.lower() for item in needles):
@@ -48,16 +48,22 @@ def function_registry() -> dict[str, dict[str, object]]:
             continue
         text = path.read_text(encoding="utf-8-sig", errors="replace")
         function_id = path.stem.lower().replace(".", "-").replace("_", "-")
+        function_spec = specification(function_id, _category(path.name))
+        declared = _parameters(text)
+        declared_names = {item["name"] for item in declared}
+        for name, value_type in function_spec.get("parameters", {}).items():
+            if name not in declared_names:
+                declared.append({"name": name, "type": str(value_type)})
         registry[function_id] = {
             "function_id": function_id,
             "script": path.name,
             "category": _category(path.name),
             "packages": _packages(text),
-            "declared_parameters": _parameters(text),
+            "declared_parameters": sorted(declared, key=lambda item: item["name"]),
             "uses_common_adapter": "amp_common.R" in text,
             "status": "registered_untested",
             "source": "team-authorized R function collection",
-            "specification": specification(function_id, _category(path.name)),
+            "specification": function_spec,
         }
         registry[function_id].update(compatibility.get(function_id, {}))
     return registry

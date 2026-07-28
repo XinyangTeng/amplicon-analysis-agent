@@ -55,6 +55,7 @@ CATEGORY_SPECS: dict[str, dict[str, Any]] = {
 
 TREE_FUNCTIONS = {"script-alpha-pd", "script-bnti", "script-bnti-rcbray"}
 KO_FUNCTIONS = {"script-function-bubble", "script-function-diff", "script-kegg-enrich"}
+PATHWAY_FUNCTIONS = {"script-kegg-enrich"}
 SOURCE_TRACKING_FUNCTIONS = {"script-feast"}
 TERNARY_FUNCTIONS = {"script-ternary"}
 GROUP_NETWORK_FUNCTIONS = {"script-network-stability", "script-network-robustness"}
@@ -64,6 +65,7 @@ def specification(function_id: str, category: str) -> dict[str, Any]:
     base = dict(CATEGORY_SPECS[category])
     base["requires_tree"] = function_id in TREE_FUNCTIONS
     base["requires_ko_annotation"] = function_id in KO_FUNCTIONS
+    base["requires_pathway_annotation"] = function_id in PATHWAY_FUNCTIONS
     base["requires_source_sink"] = function_id in SOURCE_TRACKING_FUNCTIONS
     base["requires_exactly_or_at_least_three_groups"] = function_id in TERNARY_FUNCTIONS
     base["batch_policy"] = "within_batch"
@@ -72,6 +74,7 @@ def specification(function_id: str, category: str) -> dict[str, Any]:
 
 def assess_context(function: dict[str, Any], metadata: pd.DataFrame,
                    has_tree: bool = False, has_ko: bool = False,
+                   has_pathway: bool = False,
                    source_sink_configured: bool = False) -> dict[str, Any]:
     function_id = str(function["function_id"])
     category = str(function["category"])
@@ -87,6 +90,8 @@ def assess_context(function: dict[str, Any], metadata: pd.DataFrame,
         return {"eligible": False, "reason": "phylogenetic tree is required"}
     if function_id in KO_FUNCTIONS and not has_ko:
         return {"eligible": False, "reason": "KO annotation is required"}
+    if function_id in PATHWAY_FUNCTIONS and not has_pathway:
+        return {"eligible": False, "reason": "Pathway annotation is required for offline enrichment"}
     if function_id in SOURCE_TRACKING_FUNCTIONS and not source_sink_configured:
         return {"eligible": False, "reason": "source and sink groups must be configured"}
     if function_id in TERNARY_FUNCTIONS and groups < 3:

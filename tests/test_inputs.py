@@ -65,6 +65,9 @@ def test_all_analysis_functions_are_registered_with_compatibility_status():
     assert all("function_id" in function for function in functions)
     assert get_function("script-alpha")["status"] == "verified"
     assert get_function("script-barplot")["status"] == "verified"
-    assert get_function("script-alpha-pd")["status"] == "conditional"
+    assert get_function("script-alpha-pd")["status"] == "verified"
     assert get_function("script-alpha-pd")["specification"]["requires_tree"] is True
     assert any(item["name"] == "permutations" for item in get_function("script-bnti")["declared_parameters"])
+    assert get_function("mantal-micro")["category"] == "beta_diversity"
+    assert get_function("script-function-diff")["category"] == "functional_prediction"
+    assert get_function("script-kegg-enrich")["specification"]["requires_pathway_annotation"] is True
