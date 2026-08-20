@@ -42,7 +42,7 @@ After the user answers:
 
 ## Token discipline
 
-- List functions by category; do not request the full detailed 55-function catalog.
+- List functions by category; do not request the full detailed 72-function catalog.
 - Inspect only shortlisted functions.
 - Use compact report context; open individual tables only when a claim needs verification.
 - Refer to the confirmed design contract instead of repeating the conversation.

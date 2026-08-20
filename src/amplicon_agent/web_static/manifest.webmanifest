@@ -1,9 +1,9 @@
 {
-  "name": "扩增子分析 Agent",
-  "short_name": "扩增子 Agent",
+  "name": "BioAgent 扩增子分析工作台",
+  "short_name": "BioAgent",
   "description": "先计划、后执行、可审计的扩增子微生物组分析工作台",
   "lang": "zh-CN",
-  "start_url": "/",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
@@ -11,7 +11,7 @@
   "theme_color": "#174c3c",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/assets/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

@@ -22,7 +22,7 @@ dir.create(amplicon_alpha_path, recursive = TRUE, showWarnings = FALSE)
 
 alpha_xlsx_path <- file.path(amplicon_alpha_path, "alpha_diversity_results.xlsx")
 
-amplicon_alpha_wb <- openxlsx::createWorkbook()
+amplicon_alpha_wb <- open_amp_workbook(alpha_xlsx_path)
 
 
 if (file.exists("ps.rds")) {
@@ -90,16 +90,8 @@ rare <- mean(phyloseq::sample_sums(ps.16s)) / 10
 rarefaction_metric <- param_chr(params, "alpha_rarefaction_metric", "Richness")
 rarefaction_start <- param_int(params, "alpha_rarefaction_start", 100)
 
-result_rare <- tryCatch(
-  alpha.rare.line.micro(
-    ps     = ps.16s,
-    group  = "Group",
-    method = rarefaction_metric,
-    start  = rarefaction_start,
-    step   = rare
-  ),
-  error = function(e) {
-    message("alpha.rare.line.micro failed; using fallback rarefaction curve. Reason: ", conditionMessage(e))
+result_rare <- local({
+    message("Using built-in rarefaction curve implementation.")
     otu <- as(phyloseq::otu_table(ps.16s), "matrix")
     if (phyloseq::taxa_are_rows(ps.16s)) otu <- t(otu)
     min_depth <- min(rowSums(otu))
@@ -119,7 +111,7 @@ result_rare <- tryCatch(
       ggplot2::theme_minimal()
     group_tab <- raretab %>%
       dplyr::group_by(Group, Depth) %>%
-      dplyr::summarise(Richness = mean(Richness, na.rm = TRUE), sd = stats::sd(Richness, na.rm = TRUE), .groups = "drop")
+      dplyr::summarise(sd = stats::sd(Richness, na.rm = TRUE), Richness = mean(Richness, na.rm = TRUE), .groups = "drop")
     p_group <- ggplot2::ggplot(group_tab, ggplot2::aes(Depth, Richness, color = Group)) +
       ggplot2::geom_line(linewidth = 0.8) +
       ggplot2::theme_minimal()
@@ -128,8 +120,7 @@ result_rare <- tryCatch(
       ggplot2::geom_line(linewidth = 0.8) +
       ggplot2::theme_minimal()
     list(p_sample, raretab, p_group, p_group_sd)
-  }
-)
+})
 
 # 闁告娲橀悧閬嶅嫉椤掑倵鏋呴梺鎻掞攻濞插摜鐥?
 p2_1 <- result_rare[[1]] +
@@ -144,8 +135,7 @@ raretab <- result_rare[[2]]
 p2_2 <- result_rare[[3]] +
   theme_nature() +
   theme(axis.title.y = element_text(angle = 90)) +
-  scale_color_manual(values = col.g) +
-  scale_fill_manual(values = col.g)
+  scale_color_manual(values = col.g)
 
 # 闁告帒妫涚划宥囩矙閳ь剟鏌屾繝鍐╅敜缂佹儳灏呯槐娆戞暜閿旂晫鍨奸柛鎴濇濡﹪鏁?
 p2_3 <- result_rare[[4]] +

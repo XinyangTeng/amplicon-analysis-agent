@@ -6,15 +6,8 @@ ps.16s <- ctx$ps
 top_n <- param_int(params, "filter_top_n", 500)
 tax_level <- param_chr(params, "tax_level", "OTU")
 
-res <- tryCatch(
-  DESep2Super.micro(
-    ps = ps.16s %>% ggClusterNet::filter_OTU_ps(top_n),
-    group = "Group",
-    artGroup = NULL,
-    j = tax_level
-  ),
-  error = function(original_error) {
-    message("Legacy DESeq2 wrapper failed; using native DESeq2 fallback: ", conditionMessage(original_error))
+res <- local({
+    message("Using built-in DESeq2 implementation.")
     suppressPackageStartupMessages(library(DESeq2))
     ps_use <- ps.16s %>% ggClusterNet::filter_OTU_ps(top_n)
     count_matrix <- as(phyloseq::otu_table(ps_use), "matrix")
@@ -49,8 +42,7 @@ res <- tryCatch(
       ggplot2::geom_point(alpha = 0.55, na.rm = TRUE) + ggplot2::theme_bw() +
       ggplot2::labs(title = paste("DESeq2", unique(first_contrast$contrast)[1]), y = "-log10 adjusted p")
     list(p, dat)
-  }
-)
+})
 
 p <- res[[1]]
 if (is.list(p)) p <- p[[1]]

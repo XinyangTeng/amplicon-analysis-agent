@@ -23,17 +23,37 @@ CATEGORY_SPECS: dict[str, dict[str, Any]] = {
     },
     "differential_abundance": {
         "purpose": "Identify taxa or functions differing between replicated groups.",
-        "parameters": {"tax_level": "str", "p_cutoff": "float", "adjust_p": "str", "lfc_cutoff": "float"},
+        "parameters": {
+            "tax_level": "str", "p_cutoff": "float", "adjust_p": "str", "lfc_cutoff": "float",
+            "reference_group": "str", "comparison_group": "str", "min_prevalence": "float",
+        },
         "minimum": "2 groups with at least 3 samples each",
     },
     "biomarker_ml": {
         "purpose": "Build exploratory classifiers and rank candidate biomarkers.",
-        "parameters": {"optimal": "int", "folds": "int", "seed": "int"},
+        "parameters": {
+            "optimal": "int", "folds": "int", "seed": "int", "ml_repeats": "int",
+            "reference_group": "str", "comparison_group": "str",
+        },
         "minimum": "2 groups with at least 10 samples each; nested validation recommended",
     },
     "network": {
         "purpose": "Construct and compare association networks and robustness properties.",
-        "parameters": {"top_n": "int", "cor_cutoff": "float", "p_cutoff": "float", "random_times": "int"},
+        "parameters": {
+            "top_n": "int",
+            "cor_cutoff": "float",
+            "network_q_cutoff": "float",
+            "network_method": "clr_spearman|clr_pearson|spearman",
+            "network_min_prevalence": "float",
+            "network_min_mean_abundance": "float",
+            "network_pseudocount": "float",
+            "network_hub_quantile": "float",
+            "network_group1": "str",
+            "network_group2": "str",
+            "network_permutations": "int",
+            "network_diff_q_cutoff": "float",
+            "network_diff_min": "float",
+        },
         "minimum": "at least 10 samples in a batch; 10 per group for group-network comparison",
     },
     "community_assembly": {
@@ -53,12 +73,12 @@ CATEGORY_SPECS: dict[str, dict[str, Any]] = {
     },
 }
 
-TREE_FUNCTIONS = {"script-alpha-pd", "script-bnti", "script-bnti-rcbray"}
+TREE_FUNCTIONS = {"script-alpha-pd", "script-bnti", "script-bnti-rcbray", "script-gunifrac"}
 KO_FUNCTIONS = {"script-function-bubble", "script-function-diff", "script-kegg-enrich"}
 PATHWAY_FUNCTIONS = {"script-kegg-enrich"}
 SOURCE_TRACKING_FUNCTIONS = {"script-feast"}
 TERNARY_FUNCTIONS = {"script-ternary"}
-GROUP_NETWORK_FUNCTIONS = {"script-network-stability", "script-network-robustness"}
+GROUP_NETWORK_FUNCTIONS = {"script-network-compare", "script-spieceasi", "script-wgcna"}
 
 
 def specification(function_id: str, category: str) -> dict[str, Any]:

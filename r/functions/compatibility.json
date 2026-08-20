@@ -273,5 +273,32 @@
     "status": "verified",
     "tested_on": "2026-07-28",
     "notes": "Completed compatibility smoke testing; input-specific prerequisites still apply."
-  }
+  },
+  "script-network-compositional": {
+    "status": "verified",
+    "tested_on": "2026-08-12",
+    "source": "independent project implementation",
+    "notes": "CLR-based association network completed on the 36-sample example; no additional network package is required. Empty networks are reported as valid results."
+  },
+  "script-network-compare": {
+    "status": "conditional",
+    "tested_on": "2026-08-12",
+    "source": "independent project implementation",
+    "notes": "Completed group comparison on the 36-sample example; requires two explicitly selected groups with at least ten independent samples each."
+  },
+  "script-ancombc2": {"status": "verified", "tested_on": "2026-08-12", "source": "ANCOMBC package backend", "notes": "ANCOM-BC2 completed on the 36-sample example; explicit reference and comparison groups required for multi-group projects."},
+  "script-aldex2": {"status": "verified", "tested_on": "2026-08-12", "source": "ALDEx2 package backend", "notes": "Monte Carlo CLR differential analysis completed on the 36-sample example."},
+  "script-maaslin2": {"status": "verified", "tested_on": "2026-08-12", "source": "Maaslin2 package backend", "notes": "MaAsLin2 group association completed on the 36-sample example; extend fixed effects only after design confirmation."},
+  "script-maaslin3": {"status": "verified", "tested_on": "2026-08-12", "source": "maaslin3 package backend", "notes": "MaAsLin3 abundance and prevalence model output completed on the 36-sample example."},
+  "script-linda": {"status": "verified", "tested_on": "2026-08-12", "source": "MicrobiomeStat package backend", "notes": "LinDA completed on the 36-sample example."},
+  "script-corncob": {"status": "verified", "tested_on": "2026-08-12", "source": "corncob package backend", "notes": "Beta-binomial differential test completed on the 36-sample example."},
+  "script-metagenomeseq": {"status": "verified", "tested_on": "2026-08-12", "source": "metagenomeSeq package backend", "notes": "CSS plus zero-inflated Gaussian model completed on the 36-sample example."},
+  "script-lefse": {"status": "verified", "tested_on": "2026-08-12", "source": "lefser package backend", "notes": "LEfSe completed on the 36-sample example; an empty marker set is treated as a valid scientific result."},
+  "script-breakaway": {"status": "verified", "tested_on": "2026-08-12", "source": "breakaway package backend", "notes": "Per-sample unseen-richness estimation completed on the 36-sample example."},
+  "script-gunifrac": {"status": "conditional", "tested_on": "2026-08-12", "source": "GUniFrac package backend", "notes": "Generalized UniFrac completed on the 36-sample example; a matching phylogenetic tree is required."},
+  "script-spieceasi": {"status": "conditional", "tested_on": "2026-08-12", "source": "SpiecEasi package backend", "notes": "Sparse conditional-dependence network completed on the 36-sample example; requires at least ten samples per selected group and preferably twenty or more."},
+  "script-splsda": {"status": "conditional", "tested_on": "2026-08-12", "source": "mixOmics package backend", "notes": "Repeated cross-validated sPLS-DA completed on the 36-sample example; requires at least ten samples per group and remains exploratory without external validation."},
+  "script-siamcat": {"status": "conditional", "tested_on": "2026-08-12", "source": "SIAMCAT package backend", "notes": "Repeated cross-validated ridge classifier completed on the 36-sample example; requires at least ten samples per group and independent validation for biomarker claims."},
+  "script-wgcna": {"status": "conditional", "tested_on": "2026-08-12", "source": "WGCNA package backend", "notes": "Taxon-module analysis completed on the 36-sample example; requires at least ten samples per selected group and at least ten retained taxa."},
+  "script-coda-pca": {"status": "verified", "tested_on": "2026-08-12", "source": "zCompositions, compositions, and robCompositions backends", "notes": "Multiplicative zero replacement, CLR and CoDA PCA completed on the 36-sample example."}
 }

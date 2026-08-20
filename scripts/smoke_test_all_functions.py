@@ -55,5 +55,6 @@ if result.run_directory:
     manifest = Path(result.run_directory) / "functions" / "function_manifest.json"
     if manifest.exists():
         summary["function_manifest"] = json.loads(manifest.read_text(encoding="utf-8"))
+args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 print(json.dumps({"plan_id": contract["plan_id"], "status": result.status, "summary": str(args.output)}, ensure_ascii=False))

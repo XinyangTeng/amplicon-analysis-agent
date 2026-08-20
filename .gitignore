@@ -16,4 +16,5 @@ dist/
 *.egg-info/
 workspace/
 uploads/
+outputs/
 .env

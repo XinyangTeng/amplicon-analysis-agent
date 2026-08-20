@@ -1,26 +1,118 @@
+x-amplicon-build: &amplicon-build
+  context: .
+  args:
+    UBUNTU_MIRROR: "${UBUNTU_MIRROR:-https://mirrors.aliyun.com/ubuntu}"
+    CRAN_MIRROR: "${CRAN_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/CRAN/}"
+    BIOCONDUCTOR_MIRROR: "${BIOCONDUCTOR_MIRROR:-https://bioconductor.posit.co}"
+    PIP_INDEX_URL: "${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}"
+
 services:
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 512m
+    cpus: 0.50
+
   amplicon-web:
-    build:
-      context: .
-    image: amplicon-analysis-agent:0.3.0
+    build: *amplicon-build
+    image: amplicon-analysis-agent:0.6.0
     command: ["amplicon-web"]
     ports:
       - "${WEB_PORT:-8000}:8000"
     environment:
       AMPLICON_WORKSPACE: /workspace
-      AMPLICON_WEB_TOKEN: "${AMPLICON_WEB_TOKEN:-}"
       AMPLICON_MAX_UPLOAD_MB: "${AMPLICON_MAX_UPLOAD_MB:-200}"
+      AMPLICON_MAX_TOTAL_UPLOAD_MB: "${AMPLICON_MAX_TOTAL_UPLOAD_MB:-500}"
+      AMPLICON_MAX_USER_STORAGE_MB: "${AMPLICON_MAX_USER_STORAGE_MB:-2048}"
+      AMPLICON_MAX_ACTIVE_JOBS: "${AMPLICON_MAX_ACTIVE_JOBS:-1}"
+      AMPLICON_RETENTION_DAYS: "${AMPLICON_RETENTION_DAYS:-7}"
+      AMPLICON_MONTHLY_MODEL_QUOTA: "${AMPLICON_MONTHLY_MODEL_QUOTA:-10}"
+      AMPLICON_SESSION_DAYS: "${AMPLICON_SESSION_DAYS:-7}"
+      AMPLICON_COOKIE_SECURE: "${AMPLICON_COOKIE_SECURE:-false}"
+      AMPLICON_BOOTSTRAP_INVITE: "${AMPLICON_BOOTSTRAP_INVITE:-}"
+      AMPLICON_BOOTSTRAP_INVITE_USES: "${AMPLICON_BOOTSTRAP_INVITE_USES:-10}"
+      AMPLICON_BOOTSTRAP_INVITE_DAYS: "${AMPLICON_BOOTSTRAP_INVITE_DAYS:-30}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-}"
+      PRIVACY_CONTACT: "${PRIVACY_CONTACT:-}"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
       MODEL_PROVIDER: "${MODEL_PROVIDER:-}"
       MODEL_PROTOCOL: "${MODEL_PROTOCOL:-}"
       MODEL_BASE_URL: "${MODEL_BASE_URL:-}"
       MODEL_NAME: "${MODEL_NAME:-}"
       MODEL_API_KEY: "${MODEL_API_KEY:-}"
+      MODEL_ALLOWED_HOSTS: "${MODEL_ALLOWED_HOSTS:-}"
     volumes:
       - ./workspace:/workspace
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.00
+    pids_limit: 256
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
       interval: 30s
       timeout: 8s
       retries: 3
       start_period: 20s
+
+  amplicon-worker:
+    image: amplicon-analysis-agent:0.6.0
+    command:
+      [
+        "celery", "-A", "amplicon_agent.tasks:celery_app", "worker",
+        "--loglevel=INFO", "--concurrency=1", "--max-tasks-per-child=1"
+      ]
+    environment:
+      AMPLICON_WORKSPACE: /workspace
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      AMPLICON_ANALYSIS_TIMEOUT_SECONDS: "${AMPLICON_ANALYSIS_TIMEOUT_SECONDS:-3600}"
+      AMPLICON_R_TIMEOUT_SECONDS: "${AMPLICON_R_TIMEOUT_SECONDS:-1800}"
+      AMPLICON_WORKER_MEMORY_MB: "${AMPLICON_WORKER_MEMORY_MB:-6144}"
+    volumes:
+      - ./workspace:/workspace
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 30s
+    mem_limit: 6g
+    cpus: 2.00
+    pids_limit: 512
+    tmpfs:
+      - /tmp:size=1g
+
+  amplicon-cleanup:
+    image: amplicon-analysis-agent:0.6.0
+    command:
+      [
+        "celery", "-A", "amplicon_agent.tasks:celery_app", "beat",
+        "--loglevel=INFO"
+      ]
+    environment:
+      AMPLICON_WORKSPACE: /workspace
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    volumes:
+      - ./workspace:/workspace
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.50
+    pids_limit: 128
+
+volumes:
+  redis-data:

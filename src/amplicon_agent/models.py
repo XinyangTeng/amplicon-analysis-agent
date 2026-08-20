@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 def utc_now() -> str:
@@ -29,6 +29,8 @@ class InspectionResult(BaseModel):
     groups: dict[str, int] = Field(default_factory=dict)
     taxonomy_ranks: list[str] = Field(default_factory=list)
     taxonomy_columns: list[str] = Field(default_factory=list)
+    metadata_columns: list[str] = Field(default_factory=list)
+    suggested_group_columns: list[str] = Field(default_factory=list)
     selected_taxonomy_rank: str | None = None
     warnings: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
@@ -84,3 +86,51 @@ class AnalysisInterpretation(BaseModel):
     unsupported_conclusions: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     next_steps: list[str] = Field(default_factory=list)
+
+
+class MetadataColumnRename(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    source: str
+    target: str
+    reason: str = ""
+
+
+class MetadataValueMapping(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    column: str
+    mapping: dict[str, str] = Field(default_factory=dict)
+    reason: str = ""
+
+
+class MetadataSampleAssignment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    sample_id: str
+    group: str
+    reason: str = ""
+
+
+class MetadataProposal(BaseModel):
+    """模型提出、程序验证后才能应用的 metadata 整理建议。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    summary: str
+    recommended_group_column: str
+    recommended_batch_column: str | None = None
+    recommended_gradient_column: str | None = None
+    column_renames: list[MetadataColumnRename] = Field(default_factory=list)
+    value_mappings: list[MetadataValueMapping] = Field(default_factory=list)
+    sample_group_assignments: list[MetadataSampleAssignment] = Field(
+        default_factory=list
+    )
+    controls: list[str] = Field(default_factory=list)
+    treatments: list[str] = Field(default_factory=list)
+    research_question: str = ""
+    sample_type: str = ""
+    gradient_direction: str = ""
+    design_notes: str = ""
+    questions: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)

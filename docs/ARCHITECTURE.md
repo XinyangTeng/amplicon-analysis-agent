@@ -1,6 +1,37 @@
 # Architecture
 
-The system deliberately separates biological judgment, deterministic execution, and language-model interpretation.
+The system deliberately separates biological judgment, deterministic execution, and language-model assistance. The model may explain input problems before a plan exists, but it never performs numerical analysis and cannot bypass approval.
+
+The public Web surface adds an outer multi-user boundary without changing the
+scientific execution layers:
+
+```text
+Public landing page
+        |
+Invitation-only account + CSRF-protected session
+        |
+Per-user workspace and resource ownership checks
+        |
+User-selected group column + deterministic inspection
+        |
+Optional right-side AI assistant
+  - compact metadata summary, never the abundance matrix
+  - proposed edits become a preview, never an in-place mutation
+  - explicit user confirmation before a corrected copy is activated
+        |
+Redis + Celery queue
+  - per-user concurrency
+  - wall-time, CPU and memory limits
+  - cancellation and expiry cleanup
+        |
+The same AgentService, R functions, validator and report builder
+```
+
+Account metadata, sessions, quotas, resource ownership and task state are stored
+in a small global SQLite database. Uploaded research data and generated results
+are never placed in that database; they remain under
+`workspace/users/<user-id>/`. The MCP-only local workflow continues to use the
+workspace root directly.
 
 ```text
 User and project files

@@ -88,7 +88,7 @@ dir.create(amplicon_alpha_path, recursive = TRUE, showWarnings = FALSE)
 
 alpha_xlsx_path <- file.path(amplicon_alpha_path, "alpha_diversity_results.xlsx")
 
-amplicon_alpha_wb <- openxlsx::createWorkbook()
+amplicon_alpha_wb <- open_amp_workbook(alpha_xlsx_path)
 
 requested_alpha <- param_vec(params, "alpha_metrics", c("Shannon", "Chao1", "Simpson", "Richness", "ACE", "Pielou"))
 alpha_name_map <- c(Simpson = "Inv_Simpson", Pielou = "Pielou_evenness", Evenness = "Pielou_evenness")
@@ -117,86 +117,26 @@ data$ID <- as.character(data$ID)
 head(data)
 alpha_num <- seq.int(3, ncol(data))
 
-# Kruskal-Wallis + 濠㈣埖宀搁崳绋啃掗弮鍥╃獩
-result <- tryCatch(
-  MuiKwWlx2(data = data, num = alpha_num),
-  error = function(e) {
-    message("Alpha statistical annotation failed; continuing without significance labels. Reason: ", conditionMessage(e))
-    data.frame(
-      index = all.alpha,
-      status = "statistical annotation skipped",
-      reason = conditionMessage(e),
-      stringsAsFactors = FALSE
-    )
-  }
-)
-
-if (!"status" %in% colnames(result)) {
-  result1 <- FacetMuiPlotresultBox2(
-    data   = data,
-    num    = alpha_num,
-    result = result,
-    sig_show = alpha_sig_label,
-    ncol     = alpha_ncol
-  )
-  p1_1 <- result1[[1]] +
-    ggplot2::scale_x_discrete(limits = axis_order) +
-    theme_nature() +
-    ggplot2::guides(fill = guide_legend(title = NULL)) +
-    ggplot2::scale_color_manual(values = col.g)
-
-  res2 <- FacetMuiPlotresultBar(
-    data   = data,
-    num    = alpha_num,
-    result = result,
-    sig_show = alpha_sig_label,
-    ncol     = alpha_ncol
-  )
-  p1_2 <- res2[[1]] +
-    ggplot2::scale_x_discrete(limits = axis_order) +
-    theme_nature() +
-    ggplot2::guides(fill = guide_legend(title = NULL)) +
-    ggplot2::scale_fill_manual(values = col.g)
-
-  res3 <- FacetMuiPlotReBoxBar(
-    data   = data,
-    num    = alpha_num,
-    result = result,
-    sig_show = alpha_sig_label,
-    ncol     = alpha_ncol
-  )
-  p1_3 <- res3[[1]] +
-    ggplot2::scale_x_discrete(limits = axis_order) +
-    theme_nature() +
-    ggplot2::guides(fill = guide_legend(title = NULL)) +
-    ggplot2::scale_fill_manual(values = col.g)
-
-  p1_0 <- result1[[2]] %>%
-    ggplot(aes(x = group, y = dd)) +
-    geom_violin(alpha = 1, aes(fill = group)) +
-    geom_jitter(aes(color = group), position = position_jitter(0.17), size = 3, alpha = 0.5) +
-    labs(x = "", y = "") +
-    facet_wrap(. ~ name, scales = "free_y", ncol = 4) +
-    geom_text(aes(x = group, y = y, label = stat))
-
-  p1_0 <- p1_0 +
-    ggplot2::scale_x_discrete(limits = axis_order) +
-    theme_nature() +
-    ggplot2::guides(fill = guide_legend(title = NULL)) +
-    ggplot2::scale_fill_manual(values = col.g)
-} else {
-  plot_data <- tidyr::pivot_longer(data, cols = dplyr::all_of(all.alpha), names_to = "name", values_to = "dd")
-  p1_1 <- ggplot2::ggplot(plot_data, ggplot2::aes(x = group, y = dd, fill = group, color = group)) +
-    ggplot2::geom_boxplot(alpha = 0.65, outlier.shape = NA) +
-    ggplot2::geom_jitter(width = 0.15, size = 2, alpha = 0.7) +
-    ggplot2::facet_wrap(. ~ name, scales = "free_y", ncol = alpha_ncol) +
-    ggplot2::scale_x_discrete(limits = axis_order) +
-    theme_nature() +
-    ggplot2::guides(fill = guide_legend(title = NULL))
-  p1_2 <- p1_1
-  p1_3 <- p1_1
-  p1_0 <- p1_1
-}
+# Kruskal-Wallis omnibus tests plus BH-adjusted pairwise Wilcoxon tests.
+result <- amp_alpha_tests(data, all.alpha, group_col = "group")
+plot_data <- tidyr::pivot_longer(
+  data, cols = dplyr::all_of(all.alpha), names_to = "name", values_to = "dd"
+) %>% dplyr::filter(is.finite(dd))
+plot_data$group <- factor(plot_data$group, levels = axis_order)
+test_labels <- amp_alpha_test_labels(result, facet_col = "name")
+p1_1 <- ggplot2::ggplot(plot_data, ggplot2::aes(x = group, y = dd, fill = group, color = group)) +
+  ggplot2::geom_boxplot(alpha = 0.65, outlier.shape = NA) +
+  ggplot2::geom_jitter(width = 0.15, size = 2, alpha = 0.7) +
+  ggplot2::geom_text(
+    data = test_labels, ggplot2::aes(x = 1, y = Inf, label = label),
+    inherit.aes = FALSE, hjust = 0, vjust = 1.2, size = 3
+  ) +
+  ggplot2::facet_wrap(. ~ name, scales = "free_y", ncol = alpha_ncol) +
+  ggplot2::scale_x_discrete(limits = axis_order) +
+  theme_nature() +
+  ggplot2::guides(fill = guide_legend(title = NULL)) +
+  ggplot2::scale_color_manual(values = col.g) +
+  ggplot2::scale_fill_manual(values = col.g)
 
 save_plot2(p1_1, amplicon_alpha_path, "alpha_pd_alpha_boxplot", width = 10, height = 8)
 save_preview_plot(p1_1, width = 10, height = 8)
@@ -227,32 +167,20 @@ if (!is.null(phyloseq::phy_tree(ps.16s, errorIfNULL = FALSE))) {
   tab2    <- alpha.pd.micro(ps.16s)
   head(tab2)
   
-  result_pd <- tryCatch(
-    MuiKwWlx2(data = tab2, num = 3),
-    error = function(e) {
-      message("PD statistical annotation failed; continuing without significance labels. Reason: ", conditionMessage(e))
-      data.frame(index = "pd", status = "statistical annotation skipped", reason = conditionMessage(e), stringsAsFactors = FALSE)
-    }
-  )
-  if (!"status" %in% colnames(result_pd)) {
-    result_pd1 <- FacetMuiPlotresultBox(
-      data    = tab2,
-      num     = 3,
-      result  = result_pd,
-      sig_show = alpha_sig_label,
-      ncol     = 1
-    )
-    p_pd <- result_pd1[[1]] +
-      theme_nature() +
-      ggplot2::guides(fill = guide_legend(title = NULL)) +
-      ggplot2::scale_fill_manual(values = colset1)
-  } else {
-    p_pd <- ggplot2::ggplot(tab2, ggplot2::aes(x = group, y = pd, fill = group, color = group)) +
-      ggplot2::geom_boxplot(alpha = 0.65, outlier.shape = NA) +
-      ggplot2::geom_jitter(width = 0.15, size = 2, alpha = 0.7) +
-      theme_nature() +
-      ggplot2::guides(fill = guide_legend(title = NULL))
-  }
+  result_pd <- amp_alpha_tests(tab2, "pd", group_col = "group")
+  pd_labels <- amp_alpha_test_labels(result_pd, facet_col = "metric")
+  p_pd <- ggplot2::ggplot(tab2, ggplot2::aes(x = group, y = pd, fill = group, color = group)) +
+    ggplot2::geom_boxplot(alpha = 0.65, outlier.shape = NA) +
+    ggplot2::geom_jitter(width = 0.15, size = 2, alpha = 0.7) +
+    ggplot2::annotate(
+      "text", x = 1, y = Inf,
+      label = if (nrow(pd_labels)) pd_labels$label[[1]] else "Kruskal-Wallis not applicable",
+      hjust = 0, vjust = 1.2, size = 3
+    ) +
+    theme_nature() +
+    ggplot2::guides(fill = guide_legend(title = NULL)) +
+    ggplot2::scale_fill_manual(values = colset1) +
+    ggplot2::scale_color_manual(values = colset1)
   
   ## ---- 濞ｅ洦绻傞悺?PD 闁?----
   save_plot2(p_pd, amplicon_alpha_path, "pd_diversity", width = 8, height = 6)
@@ -265,6 +193,4 @@ if (!is.null(phyloseq::phy_tree(ps.16s, errorIfNULL = FALSE))) {
 } else {
   message("No phylogenetic tree detected; skipped PD diversity analysis.")
 }
-
-
 

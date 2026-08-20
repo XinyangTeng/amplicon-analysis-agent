@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "amplicon-analysis-agent"
-version = "0.3.0"
+version = "0.6.0"
 description = "Auditable MCP agent for amplicon microbiome analysis"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,16 +17,20 @@ dependencies = [
 
 [project.optional-dependencies]
 web = [
+  "celery[redis]>=5.5,<6",
   "fastapi>=0.115,<1",
   "httpx>=0.27,<1",
   "python-multipart>=0.0.20,<1",
+  "redis>=5,<7",
   "uvicorn[standard]>=0.34,<1",
 ]
 test = [
+  "celery[redis]>=5.5,<6",
   "pytest>=8,<9",
   "fastapi>=0.115,<1",
   "httpx>=0.27,<1",
   "python-multipart>=0.0.20,<1",
+  "redis>=5,<7",
 ]
 
 [project.scripts]

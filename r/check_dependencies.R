@@ -2,10 +2,16 @@ args <- commandArgs(trailingOnly = TRUE)
 out <- if (length(args)) args[[1]] else "dependency_status.csv"
 packages <- c(
   "jsonlite", "ggplot2", "vegan", "phyloseq", "tidyverse", "Biostrings",
+  "agricolae", "ggClusterNet", "ggvenn", "microbiome", "mia",
   "ggsci", "openxlsx", "ape", "picante", "minpack.lm", "Hmisc", "fs",
   "randomForest", "caret", "e1071", "glmnet", "rpart", "ipred", "ROCR",
   "DESeq2", "ggpubr", "ggrepel", "patchwork", "reshape2", "igraph",
-  "ggraph", "pulsar", "MASS", "nnet", "edgeR", "ggalluvial"
+  "ggraph", "pulsar", "MASS", "nnet", "edgeR", "ggalluvial",
+  "ANCOMBC", "ALDEx2", "Maaslin2", "maaslin3", "corncob",
+  "MicrobiomeStat", "metagenomeSeq", "microbiomeMarker", "breakaway",
+  "GUniFrac", "mixOmics", "SIAMCAT", "SpiecEasi", "WGCNA",
+  "zCompositions", "compositions", "robCompositions", "MicrobiotaProcess",
+  "microeco", "ggpicrust2", "Tax4Fun2", "lefser"
 )
 status <- data.frame(
   package = packages,

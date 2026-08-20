@@ -71,7 +71,7 @@ dir.create(amplicon_composition_path, recursive = TRUE, showWarnings = FALSE)
 
 comp_xlsx_path <- file.path(amplicon_composition_path, "composition_results.xlsx")
 
-amplicon_composition_wb <- openxlsx::createWorkbook()
+amplicon_composition_wb <- open_amp_workbook(comp_xlsx_path)
 
 gnum       <- phyloseq::sample_data(ps.16s)$Group %>% unique() %>% length()
 axis_order <- phyloseq::sample_data(ps.16s)$Group %>% unique()

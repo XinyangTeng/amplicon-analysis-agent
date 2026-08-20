@@ -71,7 +71,7 @@ amplicon_path <- "."
 amplicon_composition_path <- file.path(amplicon_path, "03_composition")
 dir.create(amplicon_composition_path, recursive = TRUE, showWarnings = FALSE)
 comp_xlsx_path <- file.path(amplicon_composition_path, "composition_results.xlsx")
-amplicon_composition_wb <- openxlsx::createWorkbook()
+amplicon_composition_wb <- open_amp_workbook(comp_xlsx_path)
 
 message("Composition output directory: ", amplicon_composition_path)
 
@@ -82,38 +82,28 @@ pst <- pst %>% subset_taxa.wt("Genus",   "Unassigned", TRUE)
 comp_tax_level <- param_chr(params, "comp_tax_level", "Genus")
 comp_top_n <- param_int(params, "comp_top_n", 10)
 
-res16 <- tryCatch(
-  barMainplot.micro(
-    ps   = pst,
-    j    = comp_tax_level,
-    label = FALSE,
-    sd    = FALSE,
-    Top   = comp_top_n
-  ),
-  error = function(original_error) {
-    message("Legacy barplot wrapper failed; using native phyloseq fallback: ", conditionMessage(original_error))
-    ps_rank <- phyloseq::tax_glom(pst, taxrank = comp_tax_level, NArm = FALSE)
-    ps_rel <- phyloseq::transform_sample_counts(ps_rank, function(x) x / sum(x) * 100)
-    long <- phyloseq::psmelt(ps_rel)
-    long$aa <- as.character(long[[comp_tax_level]])
-    long$aa[is.na(long$aa) | long$aa == ""] <- "Unassigned"
-    ranking <- aggregate(Abundance ~ aa, long, mean)
-    top_taxa <- head(ranking$aa[order(ranking$Abundance, decreasing = TRUE)], comp_top_n)
-    long$aa[!long$aa %in% top_taxa] <- "Other"
-    group_data <- long %>%
-      dplyr::group_by(Group, aa) %>%
-      dplyr::summarise(Abundance = mean(Abundance), .groups = "drop")
-    sample_data <- long %>%
-      dplyr::group_by(Sample, Group, aa) %>%
-      dplyr::summarise(Abundance = sum(Abundance), .groups = "drop")
-    p_group <- ggplot2::ggplot(group_data, ggplot2::aes(Group, Abundance, fill = aa)) +
-      ggplot2::geom_col() + ggplot2::theme_bw() + ggplot2::labs(y = "Relative abundance (%)")
-    p_sample <- ggplot2::ggplot(group_data, ggplot2::aes(Group, Abundance, fill = aa)) +
-      ggplot2::geom_col(position = "fill") + ggplot2::theme_bw() +
-      ggplot2::labs(y = "Proportional composition")
-    list(p_group, group_data, p_sample)
-  }
-)
+message("Using built-in phyloseq composition implementation.")
+ps_rank <- phyloseq::tax_glom(pst, taxrank = comp_tax_level, NArm = FALSE)
+ps_rel <- phyloseq::transform_sample_counts(ps_rank, function(x) x / sum(x) * 100)
+long <- phyloseq::psmelt(ps_rel)
+long$aa <- as.character(long[[comp_tax_level]])
+long$aa[is.na(long$aa) | long$aa == ""] <- "Unassigned"
+ranking <- aggregate(Abundance ~ aa, long, mean)
+top_taxa <- head(ranking$aa[order(ranking$Abundance, decreasing = TRUE)], comp_top_n)
+long$aa[!long$aa %in% top_taxa] <- "Other"
+group_data <- long %>%
+  dplyr::group_by(Group, aa) %>%
+  dplyr::summarise(Abundance = mean(Abundance), .groups = "drop")
+sample_data <- long %>%
+  dplyr::group_by(Sample, Group, aa) %>%
+  dplyr::summarise(Abundance = sum(Abundance), .groups = "drop")
+p_group <- ggplot2::ggplot(group_data, ggplot2::aes(Group, Abundance, fill = aa)) +
+  ggplot2::geom_col() + ggplot2::theme_bw() + ggplot2::labs(y = "Relative abundance (%)")
+p_sample <- ggplot2::ggplot(sample_data, ggplot2::aes(Sample, Abundance, fill = aa)) +
+  ggplot2::geom_col() + ggplot2::theme_bw() +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, hjust = 1)) +
+  ggplot2::labs(x = "Sample", y = "Relative abundance (%)")
+res16 <- list(p_group, group_data, p_sample)
 
 p16_1 <- res16[[1]] +
   scale_fill_manual(values = colset2) +
@@ -123,7 +113,6 @@ p16_1 <- res16[[1]] +
 
 p16_2 <- res16[[3]] +
   scale_fill_manual(values = colset2) +
-  scale_x_discrete(limits = axis_order) +
   theme_nature() +
   theme(axis.title.y = element_text(angle = 90))
 

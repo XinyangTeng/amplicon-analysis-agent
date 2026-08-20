@@ -36,7 +36,7 @@ def test_input_change_invalidates_approval(monkeypatch, tmp_path):
     service, contract = prepare(monkeypatch, tmp_path)
     path = tmp_path / "input" / "metadata.csv"
     path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="Input changed"):
+    with pytest.raises(ValueError, match="输入文件已发生变化"):
         service.approve(contract["plan_id"], f"CONFIRM {contract['plan_id']}")
 
 

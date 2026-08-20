@@ -18,6 +18,8 @@ from .store import PlanStore
 from .function_registry import get_function, function_registry, FUNCTION_ROOT
 from .function_specs import assess_context
 from .report_builder import build_analysis_report
+from .resource_limits import subprocess_limit_kwargs, subprocess_timeout_seconds
+from .runtime_paths import R_ROOT
 
 
 EXPECTED_OUTPUTS = [
@@ -73,51 +75,58 @@ class AgentService:
         required_design = ("research_question", "sample_type", "treatments", "controls")
         missing_design = [name for name in required_design if not design.get(name)]
         if missing_design:
+            design_names = {
+                "research_question": "研究问题",
+                "sample_type": "样本类型",
+                "treatments": "处理组",
+                "controls": "对照或参照组",
+            }
             blockers.append(
-                "Project design must be confirmed before planning; missing: "
-                + ", ".join(missing_design)
+                "生成计划前必须确认实验设计；缺少："
+                + "、".join(design_names.get(name, name) for name in missing_design)
             )
         if analysis_scope not in {"full", "targeted"}:
-            blockers.append("analysis_scope must be 'full' or 'targeted'")
+            blockers.append("分析范围 analysis_scope 只能选择 full 或 targeted")
         if invalid:
-            blockers.append(f"Unsupported functions: {invalid}")
+            blockers.append(f"不支持的分析函数：{invalid}")
         for selected in selected_functions:
             if selected in baseline_functions:
                 continue
             function = get_function(selected)
+            method_label = str(function["display_name"])
             if function["status"] == "blocked" and not allow_blocked_functions:
-                blockers.append(f"Analysis function {selected} is blocked: {function.get('notes', 'compatibility failure')}")
+                blockers.append(f"分析方法“{method_label}”已被阻断：{function.get('notes', '兼容性检查失败')}")
             elif function["status"] == "blocked":
                 inspection.warnings.append(
-                    f"Development retest enabled for blocked function {selected}; do not use this in production"
+                    f"已为阻断方法“{method_label}”启用开发复测；不能用于正式分析"
                 )
             elif function["status"] == "registered_untested":
-                inspection.warnings.append(f"Analysis function {selected} has not passed compatibility testing")
+                inspection.warnings.append(f"分析方法“{method_label}”尚未通过兼容性测试")
             elif function["status"] == "conditional":
-                inspection.warnings.append(f"Analysis function {selected} is conditional: {function.get('notes', '')}")
+                inspection.warnings.append(f"分析方法“{method_label}”需要满足附加条件：{function.get('notes', '')}")
             spec = function.get("specification", {})
             if spec.get("requires_tree") and not tree:
-                inspection.warnings.append(f"Analysis function {selected} requires a phylogenetic tree and will be skipped with three-table input")
+                inspection.warnings.append(f"分析方法“{method_label}”需要系统发育树；仅有三表时将跳过")
             if spec.get("requires_ko_annotation") and not any(
                 str(column).lower() in {"ko", "koid", "kegg_orthology"}
                 for column in inspection.taxonomy_columns
             ):
-                inspection.warnings.append(f"Analysis function {selected} requires KO annotation and will be skipped")
+                inspection.warnings.append(f"分析方法“{method_label}”需要 KO 注释，将自动跳过")
             if spec.get("requires_pathway_annotation") and not any(
                 str(column).lower() in {"pathway", "kegg_pathway", "pathway_id"}
                 for column in inspection.taxonomy_columns
             ):
                 inspection.warnings.append(
-                    f"Analysis function {selected} requires Pathway annotation and will be skipped"
+                    f"分析方法“{method_label}”需要 Pathway 注释，将自动跳过"
                 )
             if spec.get("requires_source_sink") and not (
                 (function_parameters or {}).get("sink_group") and (function_parameters or {}).get("source_groups")
             ):
-                inspection.warnings.append(f"Analysis function {selected} requires explicit source/sink configuration and will be skipped")
+                inspection.warnings.append(f"分析方法“{method_label}”需要明确的 source/sink 配置，将自动跳过")
         if not 9 <= permutations <= 9999:
-            blockers.append("permutations must be between 9 and 9999")
+            blockers.append("置换次数 permutations 必须在 9 到 9999 之间")
         if not 1 <= top_n <= 50:
-            blockers.append("top_n must be between 1 and 50")
+            blockers.append("组成图 Top N 必须在 1 到 50 之间")
         contract = AnalysisContract(
             plan_id=str(uuid.uuid4()),
             files=inspection.files,
@@ -152,12 +161,12 @@ class AgentService:
     def approve(self, plan_id: str, confirmation: str) -> ApprovalResult:
         contract = self.store.load(plan_id)
         if contract.blockers:
-            raise ValueError(f"Plan is blocked: {contract.blockers}")
+            raise ValueError(f"分析计划存在阻断项：{contract.blockers}")
         if contract.approval_status != "pending":
-            raise ValueError("Plan is not pending approval")
+            raise ValueError("分析计划当前不处于等待审批状态")
         expected = f"CONFIRM {plan_id}"
         if confirmation.strip() != expected:
-            raise ValueError(f"Confirmation must exactly equal: {expected}")
+            raise ValueError(f"确认文本必须完全一致：{expected}")
         self._verify_hashes(contract)
         token = secrets.token_urlsafe(24)
         contract.approval_token_hash = token_hash(token)
@@ -168,9 +177,9 @@ class AgentService:
     def run(self, plan_id: str, approval_token: str) -> RunResult:
         contract = self.store.load(plan_id)
         if contract.approval_status != "approved" or not contract.approval_token_hash:
-            raise ValueError("Plan has not been approved or token was already consumed")
+            raise ValueError("分析计划尚未审批，或审批码已经使用")
         if not secrets.compare_digest(contract.approval_token_hash, token_hash(approval_token)):
-            raise ValueError("Invalid approval token")
+            raise ValueError("审批码无效")
         self._verify_hashes(contract)
         run_dir = secure_path(Path("runs") / plan_id, must_exist=False)
         run_dir.mkdir(parents=True, exist_ok=False)
@@ -181,7 +190,7 @@ class AgentService:
         self.store.save(contract)
         (run_dir / "analysis_contract.json").write_text(contract.model_dump_json(indent=2), encoding="utf-8")
 
-        script = Path(__file__).resolve().parents[2] / "r" / "run_analysis.R"
+        script = R_ROOT / "run_analysis.R"
         rscript = os.environ.get("RSCRIPT_BIN", "Rscript")
         log_dir = run_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -190,12 +199,13 @@ class AgentService:
         try:
             completed = subprocess.run(
                 command, capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=1800, check=False,
+                errors="replace", timeout=subprocess_timeout_seconds(), check=False,
                 env=r_subprocess_environment(),
+                **subprocess_limit_kwargs(),
             )
             log_path.write_text(completed.stdout + "\n--- STDERR ---\n" + completed.stderr, encoding="utf-8")
             if completed.returncode != 0:
-                raise RuntimeError(f"R analysis failed with exit code {completed.returncode}")
+                raise RuntimeError(f"R 分析失败，退出码：{completed.returncode}")
             function_ids = [
                 item for item in contract.functions
                 if item not in {"qc", "alpha", "beta", "composition"}
@@ -227,7 +237,7 @@ class AgentService:
     def validate(self, plan_id: str) -> dict:
         contract = self.store.load(plan_id)
         if not contract.run_directory:
-            raise ValueError("Plan has not been run")
+            raise ValueError("分析计划尚未运行")
         run_dir = secure_path(contract.run_directory)
         missing = [item for item in contract.expected_outputs if not (run_dir / item).exists()]
         pdf_without_png = [
@@ -247,7 +257,7 @@ class AgentService:
     def report(self, plan_id: str) -> dict:
         contract = self.store.load(plan_id)
         if not contract.run_directory:
-            raise ValueError("Plan has not been run")
+            raise ValueError("分析计划尚未运行")
         report = secure_path(Path(contract.run_directory) / "report.html")
         report_data = secure_path(Path(contract.run_directory) / "report_data.json")
         artifact_manifest = secure_path(Path(contract.run_directory) / "artifact_manifest.json")
@@ -263,10 +273,10 @@ class AgentService:
         """Return validated, structured results for language-model interpretation."""
         validation = self.validate(plan_id)
         if validation["status"] != "pass":
-            raise ValueError("Results must pass validation before interpretation")
+            raise ValueError("结果必须通过自动校验后才能解读")
         contract = self.store.load(plan_id)
         if not contract.run_directory:
-            raise ValueError("Plan has not been run")
+            raise ValueError("分析计划尚未运行")
         report_data_path = secure_path(Path(contract.run_directory) / "report_data.json")
         data = json.loads(report_data_path.read_text(encoding="utf-8"))
         artifacts = data.get("artifacts", {})
@@ -297,19 +307,19 @@ class AgentService:
     def result_table(self, plan_id: str, relative_path: str, limit: int = 50) -> dict:
         """Read one selected result table on demand instead of expanding every table into context."""
         if not 1 <= limit <= 200:
-            raise ValueError("limit must be between 1 and 200")
+            raise ValueError("读取行数 limit 必须在 1 到 200 之间")
         validation = self.validate(plan_id)
         if validation["status"] != "pass":
-            raise ValueError("Results must pass validation before reading result tables")
+            raise ValueError("结果必须通过自动校验后才能读取结果表")
         contract = self.store.load(plan_id)
         if not contract.run_directory:
-            raise ValueError("Plan has not been run")
+            raise ValueError("分析计划尚未运行")
         run_dir = secure_path(contract.run_directory).resolve()
         path = secure_path(run_dir / relative_path).resolve()
         if run_dir not in path.parents:
-            raise ValueError("Result table must be inside the run directory")
+            raise ValueError("结果表必须位于本次运行目录内")
         if path.suffix.lower() not in {".csv", ".tsv"}:
-            raise ValueError("Only CSV and TSV result tables can be read")
+            raise ValueError("只能读取 CSV 或 TSV 结果表")
         separator = "\t" if path.suffix.lower() == ".tsv" else ","
         frame = pd.read_csv(path, sep=separator, encoding="utf-8-sig")
         preview = frame.head(limit).astype(object)
@@ -327,10 +337,10 @@ class AgentService:
         """Persist a validated, project-specific LLM interpretation and rebuild the fixed report."""
         validation = self.validate(plan_id)
         if validation["status"] != "pass":
-            raise ValueError("Results must pass validation before interpretation")
+            raise ValueError("结果必须通过自动校验后才能解读")
         contract = self.store.load(plan_id)
         if not contract.run_directory:
-            raise ValueError("Plan has not been run")
+            raise ValueError("分析计划尚未运行")
         parsed = AnalysisInterpretation.model_validate(interpretation)
         run_dir = secure_path(contract.run_directory)
         path = run_dir / "interpretation.json"
@@ -349,7 +359,7 @@ class AgentService:
                 continue
             path = secure_path(path_value)
             if sha256_file(path) != contract.file_hashes[name]:
-                raise ValueError(f"Input changed after plan creation: {name}")
+                raise ValueError(f"生成计划后输入文件已发生变化：{name}")
 
     @staticmethod
     def _run_analysis_functions(contract: AnalysisContract, run_dir: Path,
@@ -390,7 +400,7 @@ class AgentService:
                 output_sample_ids = source_sample_ids
             missing = sorted(set(source_sample_ids) - set(map(str, abundance.columns[1:])))
             if missing:
-                raise RuntimeError(f"Cannot create function workspace; missing samples: {missing}")
+                raise RuntimeError(f"无法创建函数工作区；缺少样本：{missing}")
             context_abundance = abundance.loc[:, [abundance.columns[0], *source_sample_ids]].copy()
             context_abundance.columns = [context_abundance.columns[0], *output_sample_ids]
             context_abundance.to_csv(workspace / "otutab.txt", sep="\t", index=False)
@@ -439,7 +449,8 @@ class AgentService:
                 completed = subprocess.run(
                     [rscript, str(script)], cwd=workspace, env=env,
                     capture_output=True, text=True, encoding="utf-8", errors="replace",
-                    timeout=1800, check=False,
+                    timeout=subprocess_timeout_seconds(), check=False,
+                    **subprocess_limit_kwargs(),
                 )
                 log_name = f"{function_id}--{context_name}.log"
                 (logs / log_name).write_text(
@@ -451,9 +462,14 @@ class AgentService:
                     "log": f"logs/{log_name}",
                 }
                 if completed.returncode != 0:
-                    failures.append(f"{function_id} ({context_name})")
+                    failures.append(f"{function['display_name']}（{context_name}）")
             manifest["functions"][function_id] = {
-                "script": function["script"], "category": function["category"], "runs": function_runs
+                "display_name": function["display_name"],
+                "description": function["description"],
+                "script": function["script"],
+                "category": function["category"],
+                "category_name": function["category_name"],
+                "runs": function_runs,
             }
         manifest["status"] = "failed" if failures else "succeeded"
         manifest["files"] = [
@@ -465,4 +481,4 @@ class AgentService:
             json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         if failures:
-            raise RuntimeError("Analysis functions failed: " + ", ".join(failures))
+            raise RuntimeError("以下分析方法运行失败：" + "、".join(failures))

@@ -14,7 +14,7 @@ class PlanStore:
 
     def path(self, plan_id: str) -> Path:
         if not plan_id.replace("-", "").isalnum():
-            raise ValueError("Invalid plan ID")
+            raise ValueError("无效的分析计划编号")
         return self.root / f"{plan_id}.json"
 
     def save(self, contract: AnalysisContract) -> None:
@@ -26,4 +26,3 @@ class PlanStore:
     def load(self, plan_id: str) -> AnalysisContract:
         data = json.loads(self.path(plan_id).read_text(encoding="utf-8"))
         return AnalysisContract.model_validate(data)
-
