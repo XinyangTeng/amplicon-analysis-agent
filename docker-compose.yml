@@ -1,3 +1,11 @@
+x-amplicon-build: &amplicon-build
+  context: .
+  args:
+    UBUNTU_MIRROR: "${UBUNTU_MIRROR:-https://mirrors.aliyun.com/ubuntu}"
+    CRAN_MIRROR: "${CRAN_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/CRAN/}"
+    BIOCONDUCTOR_MIRROR: "${BIOCONDUCTOR_MIRROR:-https://bioconductor.posit.co}"
+    PIP_INDEX_URL: "${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}"
+
 services:
   redis:
     image: redis:7.4-alpine
@@ -14,9 +22,8 @@ services:
     cpus: 0.50
 
   amplicon-web:
-    build:
-      context: .
-    image: amplicon-analysis-agent:0.4.0
+    build: *amplicon-build
+    image: amplicon-analysis-agent:0.6.0
     command: ["amplicon-web"]
     ports:
       - "${WEB_PORT:-8000}:8000"
@@ -60,9 +67,7 @@ services:
       start_period: 20s
 
   amplicon-worker:
-    build:
-      context: .
-    image: amplicon-analysis-agent:0.4.0
+    image: amplicon-analysis-agent:0.6.0
     command:
       [
         "celery", "-A", "amplicon_agent.tasks:celery_app", "worker",
@@ -89,9 +94,7 @@ services:
       - /tmp:size=1g
 
   amplicon-cleanup:
-    build:
-      context: .
-    image: amplicon-analysis-agent:0.4.0
+    image: amplicon-analysis-agent:0.6.0
     command:
       [
         "celery", "-A", "amplicon_agent.tasks:celery_app", "beat",

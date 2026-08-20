@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Annotated, Any, AsyncIterator
 
 from fastapi import Cookie, Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, SecretStr
 
@@ -24,7 +25,13 @@ from .model_client import (
     public_model_config,
     resolved_model_config,
 )
-from .security import secure_path, user_workspace, workspace_root, workspace_scope
+from .metadata_assistant import (
+    build_metadata_context,
+    metadata_proposal_schema,
+    validate_and_preview_proposal,
+    write_draft,
+)
+from .security import secure_path, sha256_file, user_workspace, workspace_root, workspace_scope
 from .service import AgentService
 from .store import PlanStore
 from .tasks import celery_app, enqueue_analysis
@@ -58,9 +65,30 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="BioAgent 扩增子分析工作台",
     description="邀请制、先计划后执行、可审计的扩增子微生物组分析",
-    version="0.4.0",
+    version="0.6.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def chinese_validation_error(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    del request
+    fields = sorted(
+        {
+            str(item)
+            for error in exc.errors()
+            for item in error.get("loc", [])[1:]
+            if isinstance(item, (str, int))
+        }
+    )
+    suffix = f"（请检查：{'、'.join(fields)}）" if fields else ""
+    return JSONResponse(
+        status_code=422,
+        content={"detail": f"提交内容不完整或格式不正确{suffix}"},
+    )
 
 
 def api_error(exc: Exception) -> HTTPException:
@@ -547,6 +575,8 @@ async def inspect_upload(
     tree: Annotated[UploadFile | None, File()] = None,
     representative_sequences: Annotated[UploadFile | None, File()] = None,
 ) -> dict[str, Any]:
+    if not group_column.strip():
+        raise HTTPException(400, "必须先从 metadata 中选择分组列")
     upload_id = str(uuid.uuid4())
     upload_dir = secure_path(Path("uploads") / upload_id, must_exist=False)
     existing_bytes = _directory_size(workspace_root())
@@ -609,9 +639,309 @@ async def inspect_upload(
         raise api_error(exc)
 
 
+class ReinspectRequest(BaseModel):
+    group_column: str = Field(min_length=1)
+    batch_column: str | None = None
+    gradient_column: str | None = None
+
+
+@app.post("/api/uploads/{upload_id}/reinspect")
+def reinspect_upload(
+    upload_id: str,
+    request: ReinspectRequest,
+    identity: Annotated[SessionIdentity, Depends(scoped_identity)],
+) -> dict[str, Any]:
+    """用户手动指定列后重新检查，不调用模型、不消耗额度。"""
+    try:
+        if not request.group_column.strip():
+            raise ValueError("必须选择分组列")
+        paths = _read_upload_manifest(upload_id, identity.user.user_id)
+        inspection = AgentService().inspect(
+            paths["abundance"],
+            paths["taxonomy"],
+            paths["metadata"],
+            request.group_column.strip(),
+            request.batch_column.strip() if request.batch_column else None,
+            request.gradient_column.strip() if request.gradient_column else None,
+        )
+        return {
+            "upload_id": upload_id,
+            "files": paths,
+            "inspection": inspection,
+            "expires_in_days": identity.user.retention_days,
+        }
+    except Exception as exc:
+        raise api_error(exc)
+
+
+class AssistantMessage(BaseModel):
+    role: str
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class AssistantChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    upload_id: str | None = None
+    plan_id: str | None = None
+    group_column: str | None = None
+    batch_column: str | None = None
+    gradient_column: str | None = None
+    history: list[AssistantMessage] = Field(default_factory=list, max_length=8)
+    settings: ModelCallSettings | None = None
+
+
+def _create_metadata_draft(
+    *,
+    upload_id: str,
+    metadata_path: Path,
+    proposal: dict[str, Any],
+) -> dict[str, Any]:
+    draft_id = str(uuid.uuid4())
+    upload_dir = _upload_root(upload_id)
+    preview_path = upload_dir / f"metadata_preview_{draft_id}.csv"
+    preview = validate_and_preview_proposal(
+        metadata_path,
+        proposal,
+        preview_path,
+    )
+    draft = {
+        "draft_id": draft_id,
+        "upload_id": upload_id,
+        **preview,
+    }
+    write_draft(upload_dir / f"metadata_ai_draft_{draft_id}.json", draft)
+    return draft
+
+
+@app.post("/api/assistant/chat")
+def assistant_chat(
+    request: AssistantChatRequest,
+    identity: Annotated[SessionIdentity, Depends(scoped_identity)],
+) -> dict[str, Any]:
+    """贯穿检查、计划和运行阶段的中文专家对话。"""
+    try:
+        context: dict[str, Any] = {"当前阶段": "尚未上传数据"}
+        metadata_path: Path | None = None
+        metadata_rows_complete = False
+
+        if request.plan_id:
+            _require_plan_owner(request.plan_id, identity.user.user_id)
+            service = AgentService()
+            contract = service.status(request.plan_id)
+            contract["job"] = AuthStore().job_status(
+                plan_id=request.plan_id,
+                user_id=identity.user.user_id,
+            )
+            context = {
+                "当前阶段": "分析计划或运行阶段",
+                "分析计划": contract,
+            }
+            if contract.get("status") == "succeeded":
+                context["已校验结果"] = service.report_context(request.plan_id)
+        elif request.upload_id:
+            paths = _read_upload_manifest(
+                request.upload_id,
+                identity.user.user_id,
+            )
+            inspection = AgentService().inspect(
+                paths["abundance"],
+                paths["taxonomy"],
+                paths["metadata"],
+                (request.group_column or "").strip(),
+                request.batch_column.strip() if request.batch_column else None,
+                request.gradient_column.strip()
+                if request.gradient_column
+                else None,
+            )
+            metadata_path = secure_path(paths["metadata"])
+            context = build_metadata_context(
+                metadata_path,
+                inspection=inspection,
+                user_context=request.message,
+                priority_columns=[
+                    value
+                    for value in (
+                        request.group_column,
+                        request.batch_column,
+                        request.gradient_column,
+                    )
+                    if value
+                ],
+            )
+            context["当前阶段"] = "数据检查与实验设计确认"
+            metadata_rows_complete = bool(
+                context.get("metadata", {}).get("rows_are_complete")
+            )
+
+        output_hint = {
+            "reply": "给用户的中文回复；说明判断依据和下一步",
+            "metadata_proposal": (
+                metadata_proposal_schema() if request.upload_id else None
+            ),
+        }
+        history = [
+            {
+                "role": item.role if item.role in {"user", "assistant"} else "user",
+                "content": item.content,
+            }
+            for item in request.history[-6:]
+        ]
+        result = _model_call(
+            user=identity.user,
+            settings=request.settings,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "你是扩增子微生物组实验设计与统计分析专家。所有面向用户的文字必须使用中文，"
+                        "允许保留 Sample ID、Feature、metadata、ASV/OTU、Alpha、Beta、PERMANOVA 等常用术语。"
+                        "只能根据用户说明和提供的结构化上下文判断，不能虚构处理、对照、样本含义或结果。"
+                        "不得建议改动 Sample ID，不得把未观察到的值写入映射。信息不足时应明确提问。"
+                        "在运行阶段只能解释状态、错误和已校验结果，不能声称自己已修改参数或数值结果。"
+                        "仅当确实需要整理 metadata 时填写 metadata_proposal；否则必须为 null。"
+                        "输出严格 JSON，不要使用 Markdown。"
+                    ),
+                },
+                *history,
+                {
+                    "role": "user",
+                    "content": (
+                        f"用户当前问题：{request.message}\n"
+                        f"输出结构：{json.dumps(output_hint, ensure_ascii=False)}\n"
+                        f"当前上下文：{json.dumps(context, ensure_ascii=False)}"
+                    ),
+                },
+            ],
+            response_format={"type": "json_object"},
+        )
+        parsed = _extract_json(result)
+        reply = str(parsed.get("reply") or "模型没有返回可读回复。")
+        response: dict[str, Any] = {"reply": reply, "metadata_draft": None}
+        proposal = parsed.get("metadata_proposal")
+        if proposal and request.upload_id and metadata_path:
+            if proposal.get("sample_group_assignments") and not metadata_rows_complete:
+                response["proposal_warning"] = (
+                    "metadata 样本较多，模型只看到了代表行，因此没有生成逐样本修改预览。"
+                )
+            else:
+                try:
+                    response["metadata_draft"] = _create_metadata_draft(
+                        upload_id=request.upload_id,
+                        metadata_path=metadata_path,
+                        proposal=proposal,
+                    )
+                except Exception as exc:
+                    response["proposal_warning"] = (
+                        f"模型提出了整理建议，但安全校验未通过：{exc}"
+                    )
+        return response
+    except Exception as exc:
+        raise api_error(exc)
+
+
+class MetadataApplyRequest(BaseModel):
+    draft_id: str
+    accepted: bool = False
+
+
+def _metadata_draft_path(upload_id: str, draft_id: str) -> Path:
+    try:
+        normalized = str(uuid.UUID(draft_id))
+    except ValueError as exc:
+        raise HTTPException(400, "无效的修正预览编号") from exc
+    return _upload_root(upload_id) / f"metadata_ai_draft_{normalized}.json"
+
+
+@app.post("/api/uploads/{upload_id}/metadata/apply")
+def apply_metadata_draft(
+    upload_id: str,
+    request: MetadataApplyRequest,
+    identity: Annotated[SessionIdentity, Depends(scoped_identity)],
+) -> dict[str, Any]:
+    try:
+        if not request.accepted:
+            raise ValueError("必须先确认已核对修正预览")
+        paths = _read_upload_manifest(upload_id, identity.user.user_id)
+        draft_path = _metadata_draft_path(upload_id, request.draft_id)
+        if not draft_path.exists():
+            raise FileNotFoundError("修正预览不存在或已经过期")
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        source = secure_path(paths["metadata"])
+        if sha256_file(source) != draft.get("source_hash"):
+            raise ValueError("metadata 已发生变化，请重新让 AI 生成修正预览")
+        preview = secure_path(draft["preview_path"])
+        corrected = _upload_root(upload_id) / (
+            f"metadata_corrected_{request.draft_id}.csv"
+        )
+        shutil.copyfile(preview, corrected)
+        relative_corrected = str(
+            corrected.relative_to(workspace_root())
+        ).replace("\\", "/")
+        paths.setdefault("metadata_original", paths["metadata"])
+        paths["metadata"] = relative_corrected
+        paths["metadata_corrected"] = relative_corrected
+        (_upload_root(upload_id) / "upload.json").write_text(
+            json.dumps(paths, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        (_upload_root(upload_id) / "metadata_changes.json").write_text(
+            json.dumps(
+                {
+                    "draft_id": request.draft_id,
+                    "proposal": draft["proposal"],
+                    "changes": draft["changes"],
+                    "source_hash": draft["source_hash"],
+                    "corrected_hash": sha256_file(corrected),
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        proposal = draft["proposal"]
+        group_column = str(proposal["recommended_group_column"])
+        batch_column = proposal.get("recommended_batch_column")
+        gradient_column = proposal.get("recommended_gradient_column")
+        inspection = AgentService().inspect(
+            paths["abundance"],
+            paths["taxonomy"],
+            paths["metadata"],
+            group_column,
+            str(batch_column) if batch_column else None,
+            str(gradient_column) if gradient_column else None,
+        )
+        return {
+            "upload_id": upload_id,
+            "inspection": inspection,
+            "experimental_design": proposal,
+            "group_column": group_column,
+            "batch_column": batch_column,
+            "gradient_column": gradient_column,
+            "download_url": f"/api/uploads/{upload_id}/metadata/corrected",
+        }
+    except Exception as exc:
+        raise api_error(exc)
+
+
+@app.get("/api/uploads/{upload_id}/metadata/corrected")
+def download_corrected_metadata(
+    upload_id: str,
+    identity: Annotated[SessionIdentity, Depends(scoped_identity)],
+) -> FileResponse:
+    paths = _read_upload_manifest(upload_id, identity.user.user_id)
+    value = paths.get("metadata_corrected")
+    if not value:
+        raise HTTPException(404, "尚未生成修正后的 metadata")
+    return FileResponse(
+        secure_path(value),
+        media_type="text/csv; charset=utf-8",
+        filename="metadata_corrected.csv",
+    )
+
+
 class PlanRequest(BaseModel):
     upload_id: str
-    group_column: str
+    group_column: str = Field(min_length=1)
     batch_column: str | None = None
     gradient_column: str | None = None
     research_question: str = Field(min_length=3)

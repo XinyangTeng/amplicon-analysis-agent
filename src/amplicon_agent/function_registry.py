@@ -4,20 +4,22 @@ import re
 import json
 from pathlib import Path
 
+from .function_presentations import CATEGORY_NAMES_ZH, presentation
 from .function_specs import specification
+from .runtime_paths import R_ROOT
 
 
-FUNCTION_ROOT = Path(__file__).resolve().parents[2] / "r" / "functions"
+FUNCTION_ROOT = R_ROOT / "functions"
 
 
 def _category(name: str) -> str:
     rules = [
-        (("alpha", "rarefaction"), "alpha_diversity"),
-        (("ordinate", "pca", "microtest", "distance", "cluster", "mantal", "mantel"), "beta_diversity"),
+        (("alpha", "rarefaction", "breakaway"), "alpha_diversity"),
+        (("ordinate", "pca", "microtest", "distance", "cluster", "mantal", "mantel", "gunifrac", "coda"), "beta_diversity"),
         (("barplot", "heatmap", "sankey", "ternary", "flower", "venn", "Ven", "cir_", "clumicro", "maptree"), "composition"),
-        (("deseq2", "edger", "volcano", "stamp", "manhattan"), "differential_abundance"),
-        (("random_forest", "rfcv", "svm", "lasso", "decision_tree", "naive_bayes", "bagging", "nnet", "lda", "roc", "loading_pca"), "biomarker_ml"),
-        (("network",), "network"),
+        (("deseq2", "edger", "volcano", "stamp", "manhattan", "ancombc", "aldex", "maaslin", "linda", "corncob", "metagenomeseq"), "differential_abundance"),
+        (("random_forest", "rfcv", "svm", "lasso", "decision_tree", "naive_bayes", "bagging", "nnet", "lda", "roc", "loading_pca", "lefse", "splsda", "siamcat"), "biomarker_ml"),
+        (("network", "spieceasi", "wgcna"), "network"),
         (("bnti", "rcbray", "neutral", "nullmodel", "feast"), "community_assembly"),
         (("kegg", "function_bubble", "function_diff"), "functional_prediction"),
     ]
@@ -48,7 +50,9 @@ def function_registry() -> dict[str, dict[str, object]]:
             continue
         text = path.read_text(encoding="utf-8-sig", errors="replace")
         function_id = path.stem.lower().replace(".", "-").replace("_", "-")
-        function_spec = specification(function_id, _category(path.name))
+        category = _category(path.name)
+        function_spec = specification(function_id, category)
+        user_presentation = presentation(function_id, category)
         declared = _parameters(text)
         declared_names = {item["name"] for item in declared}
         for name, value_type in function_spec.get("parameters", {}).items():
@@ -56,8 +60,11 @@ def function_registry() -> dict[str, dict[str, object]]:
                 declared.append({"name": name, "type": str(value_type)})
         registry[function_id] = {
             "function_id": function_id,
+            "display_name": user_presentation["display_name"],
+            "description": user_presentation["description"],
             "script": path.name,
-            "category": _category(path.name),
+            "category": category,
+            "category_name": CATEGORY_NAMES_ZH[category],
             "packages": _packages(text),
             "declared_parameters": sorted(declared, key=lambda item: item["name"]),
             "uses_common_adapter": "amp_common.R" in text,

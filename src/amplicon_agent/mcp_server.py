@@ -28,7 +28,10 @@ def list_amplicon_analysis_functions(category: str | None = None) -> dict:
     compact = [
         {
             "function_id": item["function_id"],
+            "display_name": item["display_name"],
+            "description": item["description"],
             "category": item["category"],
+            "category_name": item["category_name"],
             "status": item["status"],
             "minimum": item["specification"].get("minimum"),
         }

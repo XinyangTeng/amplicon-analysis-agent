@@ -4,6 +4,7 @@ import pandas as pd
 
 from amplicon_agent.inputs import inspect_inputs
 from amplicon_agent.function_registry import get_function, list_functions
+from amplicon_agent.function_specs import assess_context
 
 
 DEMO = Path(__file__).parents[1] / "examples" / "demo"
@@ -40,7 +41,7 @@ def test_negative_counts_are_blocked(monkeypatch, tmp_path):
     (tmp_path / "metadata.csv").write_bytes((DEMO / "metadata.csv").read_bytes())
     result = inspect_inputs("abundance.csv", "taxonomy.csv", "metadata.csv", "Group")
     assert result.status == "blocked"
-    assert any("negative" in item for item in result.blockers)
+    assert any("负数" in item for item in result.blockers)
 
 
 def test_batch_and_ordered_gradient_design_is_summarized(monkeypatch, tmp_path):
@@ -61,8 +62,12 @@ def test_batch_and_ordered_gradient_design_is_summarized(monkeypatch, tmp_path):
 
 def test_all_analysis_functions_are_registered_with_compatibility_status():
     functions = list_functions()
-    assert len(functions) == 55
+    assert len(functions) == 72
     assert all("function_id" in function for function in functions)
+    assert all(function["display_name"] != function["function_id"] for function in functions)
+    assert all(function["display_name"] != "待命名分析方法" for function in functions)
+    assert all(function["description"] for function in functions)
+    assert all(function["category_name"] for function in functions)
     assert get_function("script-alpha")["status"] == "verified"
     assert get_function("script-barplot")["status"] == "verified"
     assert get_function("script-alpha-pd")["status"] == "verified"
@@ -71,3 +76,33 @@ def test_all_analysis_functions_are_registered_with_compatibility_status():
     assert get_function("mantal-micro")["category"] == "beta_diversity"
     assert get_function("script-function-diff")["category"] == "functional_prediction"
     assert get_function("script-kegg-enrich")["specification"]["requires_pathway_annotation"] is True
+    assert get_function("script-network-compositional")["category"] == "network"
+    assert get_function("script-network-compare")["category"] == "network"
+    assert get_function("script-network-compositional")["status"] == "verified"
+    assert get_function("script-network-compare")["status"] == "conditional"
+    assert get_function("script-ancombc2")["status"] == "verified"
+    assert get_function("script-coda-pca")["category"] == "beta_diversity"
+    assert get_function("script-gunifrac")["specification"]["requires_tree"] is True
+    assert get_function("script-siamcat")["status"] == "conditional"
+    assert get_function("script-spieceasi")["category"] == "network"
+    assert any(
+        item["name"] == "network_group1"
+        for item in get_function("script-network-compare")["declared_parameters"]
+    )
+
+
+def test_network_comparison_requires_ten_samples_per_group():
+    function = get_function("script-network-compare")
+    insufficient = pd.DataFrame({"Group": ["A"] * 9 + ["B"] * 12})
+    eligible = pd.DataFrame({"Group": ["A"] * 10 + ["B"] * 10})
+    assert assess_context(function, insufficient)["eligible"] is False
+    assert assess_context(function, eligible)["eligible"] is True
+
+
+def test_package_backed_ml_and_network_methods_enforce_replication():
+    insufficient = pd.DataFrame({"Group": ["A"] * 8 + ["B"] * 12})
+    eligible = pd.DataFrame({"Group": ["A"] * 10 + ["B"] * 10})
+    for function_id in ("script-siamcat", "script-splsda", "script-spieceasi", "script-wgcna"):
+        function = get_function(function_id)
+        assert assess_context(function, insufficient)["eligible"] is False
+        assert assess_context(function, eligible)["eligible"] is True

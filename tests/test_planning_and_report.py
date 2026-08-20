@@ -19,7 +19,7 @@ def test_prepare_blocks_unconfirmed_design(monkeypatch, tmp_path):
     for name in ("abundance.csv", "taxonomy.csv", "metadata.csv"):
         (tmp_path / name).write_bytes((DEMO / name).read_bytes())
     contract = AgentService().prepare("abundance.csv", "taxonomy.csv", "metadata.csv", "Group")
-    assert any("Project design must be confirmed" in item for item in contract["blockers"])
+    assert any("必须确认实验设计" in item for item in contract["blockers"])
 
 
 def test_report_embeds_only_png_and_interpretation(tmp_path):

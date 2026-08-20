@@ -15,7 +15,7 @@ Docker 一键启动：
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up --build
+.\scripts\start_stack.ps1
 ```
 
 打开 `http://127.0.0.1:8001`。公开介绍页位于 `/`，分析入口位于 `/app`。正式多用户测试应使用 Docker Compose，它会同时启动 Redis、Celery 分析 Worker 和自动清理服务。模型接口支持共享额度与用户自带 API Key；没有模型 API 也可以完成统计分析和固定报告。完整说明见 [`docs/WEB_APP.md`](docs/WEB_APP.md)。
@@ -36,28 +36,32 @@ docker compose up --build
 - 无有效重复时自动跳过不适用的显著性检验。
 - 支持按 `batch_column` 分层推断，避免实验批次与处理效应混杂；
 - 支持通过 `gradient_column` 分析连续增强的胁迫梯度。
-- 注册55个 R 分析函数，并记录 `verified`、`registered_untested`、`conditional`、`blocked` 兼容状态；
+- 注册72个 R 分析函数，并记录 `verified`、`registered_untested`、`conditional`、`blocked` 兼容状态；
 - 扩展函数在批次隔离的 phyloseq 工作区执行，输出独立日志和清单。
 - 支持可选系统发育树、代表序列和函数专属参数，全部纳入文件哈希与审批失效机制；
 - 函数执行前按批次检查样本量、分组数、树、KO及source/sink等前置条件。
 - 全部函数完成后，确定性脚本自动扫描运行目录，只把 PNG 图件按批次/结果类型导入统一 HTML；PDF 仅作为下载文件，避免重复；
 - 自动生成紧凑 `report_data.json` 上下文供大模型在校验通过后解读；
 - Agent 将项目化解读写入 `interpretation.json`，固定报告生成器再合并到 HTML；生成带文件哈希的 `artifact_manifest.json`；
-- 提供 36 样本综合示例、R 依赖检查和 55 函数全量冒烟验收脚本。
+- 提供 36 样本综合示例、R 依赖检查和 72 函数冒烟验收脚本。
 - 公开介绍页与邀请制账户；用户目录、计划和报告相互隔离；
 - Redis + Celery 任务队列，限制并发、CPU、内存、运行时间、上传和个人存储；
 - 共享模型月度额度与 BYOK；API Key 不写入服务器；
+- 用户首次必须自行选择分组列；检查通过时不调用模型；
+- 右侧 AI 助手贯穿检查、计划、运行和结果阶段，按需解释问题；
+- AI 对 metadata 的建议先生成安全预览，人工确认后才启用修正副本并重新检查；
+- 共享模型调用成功才扣额度，失败调用自动释放；
 - 到期自动删除、手动删除全部数据、账户注销和公开隐私政策。
 
 ## 分层架构
 
-`强制 Plan 问询 → 文件检查与设计确认 → MCP 合同/审批 → R 确定性计算 → 校验 → 大模型项目化解读 → 固定报告重建`
+`用户指定分组 → 文件检查 → 可选 AI 辅助修正 → 设计确认 → MCP 合同/审批 → R 确定性计算 → 校验 → 大模型项目化解读 → 固定报告重建`
 
 - 专家 Skill 解析生物学问题和实验设计、整理输入、选择合适分析并设定解释边界；
 - MCP Server 负责工具 Schema、路径安全、输入哈希、分析合同、一次性审批和执行状态；
 - R 分析函数只负责统计计算和原始图表；
 - 报告脚本递归扫描结果文件夹，自动生成 HTML、机器可读摘要和完整产物清单；
-- 大模型只在校验通过后读取结构化摘要，负责解释，不负责计算、找文件或拼报告。
+- 大模型可按需读取压缩后的 metadata 摘要以解释输入问题；结果阶段只读取校验通过的结构化摘要。它不负责计算、找文件或拼报告。
 
 详细设计见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 当前逐函数验收结果见 [`docs/VALIDATION_STATUS.md`](docs/VALIDATION_STATUS.md)。
@@ -93,24 +97,24 @@ python scripts/smoke_test_all_functions.py
 
 ```powershell
 $env:PYTHONPATH="src"
-python scripts/demo_run.py --workspace "E:\桌面\生信agent" `
-  --abundance "rawdata\otutab.txt" `
-  --taxonomy "rawdata\taxonomy.txt" `
-  --metadata "rawdata\metadata.tsv" `
+python scripts/demo_run.py --workspace "." `
+  --abundance ".\rawdata\otutab.txt" `
+  --taxonomy ".\rawdata\taxonomy.txt" `
+  --metadata ".\rawdata\metadata.tsv" `
   --group-column treatment
 ```
 
 ## Docker 与 Claude Code
 
 ```powershell
-docker build -t amplicon-analysis-agent:0.4.0 .
-docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.4.0
+docker build -t amplicon-analysis-agent:0.6.0 .
+docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.6.0
 ```
 
 构建镜像后，可复制 `.mcp.json.example` 为 `.mcp.json`，或执行：
 
 ```powershell
-claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.4.0
+claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e AMPLICON_WORKSPACE=/workspace amplicon-analysis-agent:0.6.0
 ```
 
 建议提示词：
@@ -132,9 +136,11 @@ claude mcp add amplicon-analysis -- docker run --rm -i -v "${PWD}:/workspace" -e
 
 扩展能力查询工具：`list_amplicon_analysis_functions`、`inspect_amplicon_function`。
 
-完整的55个函数、状态、参数和前置条件见 [`docs/FUNCTION_CATALOG.md`](docs/FUNCTION_CATALOG.md)。
+完整的72个函数、状态、参数和前置条件见 [`docs/FUNCTION_CATALOG.md`](docs/FUNCTION_CATALOG.md)，已安装R包与项目方法的映射见 [`docs/R_PACKAGE_METHOD_MAP.md`](docs/R_PACKAGE_METHOD_MAP.md)。
 
-函数兼容状态由当前环境的全量冒烟测试清单生成，而不是人工宣称。当前综合示例在同一合同内完成 55/55 个函数，兼容清单为 55 个 `verified`、0 个 `blocked`。真实项目仍会根据样本量、树、KO/Pathway 和 source/sink 等前提动态跳过不适用方法。运行 `python scripts/update_compatibility_from_manifest.py function_smoke_summary.json` 可同步新的验收状态。
+函数兼容状态由当前环境的冒烟测试清单生成，而不是人工宣称。原有55个函数已完成 55/55 验收；2个网络扩展和15个R包后端方法也已在36样本示例中分别执行。当前登记为66个 `verified`、6个 `conditional`、0个 `blocked`。真实项目仍会根据样本量、树、KO/Pathway、外部参考数据库和source/sink等前提动态跳过不适用方法。运行 `python scripts/update_compatibility_from_manifest.py function_smoke_summary.json` 可同步新的验收状态。
+
+2026-08-15 已完成正式 Docker 验收：镜像内 59/59 个 R 包可加载，72/72 个函数在综合示例上成功执行，报告嵌入 100 张 PNG，且所有 PDF 都有同名 PNG；最终 0.6.0 Web、Redis、Celery worker/cleanup 服务在 8001 端口健康运行。详细证据见 [`docs/VALIDATION_STATUS.md`](docs/VALIDATION_STATUS.md)。
 
 多实验数据应在检查和计划工具中同时传入 `batch_column`。剂量、时间或胁迫强度为有序数值时传入 `gradient_column`。此时分类实验在批次内部运行 Kruskal–Wallis、PERMANOVA 与离散度检验；完整数值梯度运行 Spearman Alpha 趋势和连续变量 PERMANOVA。Agent 不执行跨批次的总体显著性检验。
 

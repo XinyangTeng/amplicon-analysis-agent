@@ -1,7 +1,7 @@
-const CACHE = "amplicon-agent-v5";
+const CACHE = "amplicon-agent-v7";
 const STATIC_ASSETS = [
-  "/assets/app.js?v=5",
-  "/assets/style.css?v=5",
+  "/assets/app.js?v=7",
+  "/assets/style.css?v=7",
   "/assets/icon.svg",
   "/assets/manifest.webmanifest",
 ];

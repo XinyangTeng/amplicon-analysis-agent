@@ -38,4 +38,3 @@ def subprocess_limit_kwargs() -> dict[str, Any]:
         resource.setrlimit(resource.RLIMIT_NOFILE, (1024, 1024))
 
     return {"preexec_fn": apply_limits}
-

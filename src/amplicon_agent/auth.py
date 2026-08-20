@@ -488,6 +488,7 @@ class AuthStore:
                 """
                 SELECT COUNT(*) AS value FROM model_usage
                 WHERE user_id = ? AND source = 'server'
+                  AND status = 'succeeded'
                   AND created_at >= ?
                 """,
                 (user.user_id, iso_time(period_start)),
@@ -586,14 +587,16 @@ class AuthStore:
                 used = connection.execute(
                     """
                     SELECT COUNT(*) AS value FROM model_usage
-                    WHERE user_id = ? AND source = 'server' AND created_at >= ?
+                    WHERE user_id = ? AND source = 'server'
+                      AND status IN ('started', 'succeeded')
+                      AND created_at >= ?
                     """,
                     (user.user_id, iso_time(period_start)),
                 ).fetchone()["value"]
                 if int(used) >= user.monthly_model_quota:
                     connection.execute("ROLLBACK")
                     raise ValueError(
-                        "本月共享模型额度已用完；可以填写自己的 API Key 后继续解读"
+                        "本月共享模型额度已用完；可以填写自己的 API Key 后继续使用 AI 助手"
                     )
             connection.execute(
                 """

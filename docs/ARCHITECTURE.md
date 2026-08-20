@@ -1,6 +1,6 @@
 # Architecture
 
-The system deliberately separates biological judgment, deterministic execution, and language-model interpretation.
+The system deliberately separates biological judgment, deterministic execution, and language-model assistance. The model may explain input problems before a plan exists, but it never performs numerical analysis and cannot bypass approval.
 
 The public Web surface adds an outer multi-user boundary without changing the
 scientific execution layers:
@@ -11,6 +11,13 @@ Public landing page
 Invitation-only account + CSRF-protected session
         |
 Per-user workspace and resource ownership checks
+        |
+User-selected group column + deterministic inspection
+        |
+Optional right-side AI assistant
+  - compact metadata summary, never the abundance matrix
+  - proposed edits become a preview, never an in-place mutation
+  - explicit user confirmation before a corrected copy is activated
         |
 Redis + Celery queue
   - per-user concurrency

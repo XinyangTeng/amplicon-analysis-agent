@@ -1,6 +1,6 @@
 # Web、邀请制账户与可安装 App
 
-从 `0.4.0` 起，Web 入口分为两个表面：
+从 `0.5.0` 起，Web 入口分为两个表面：
 
 - `/`：公开介绍页，可被搜索引擎收录；
 - `/app`：邀请制分析工作台，未登录时跳转到 `/login`。
@@ -11,7 +11,8 @@
 公开介绍页
   → 邀请码注册 / 登录
   → 用户独立工作区
-  → 文件检查
+  → 用户指定分组列并检查
+  → 可选的右侧 AI 对话与 metadata 修正预览
   → 实验设计与计划
   → 一次性审批
   → Redis + Celery 队列
@@ -38,15 +39,24 @@ PRIVACY_CONTACT=你的联系邮箱
 启动 Web、Redis、分析 Worker 和自动清理服务：
 
 ```powershell
-docker compose up --build
+.\scripts\start_stack.ps1
 ```
+
+脚本会自动选择当前机器可用的 `docker compose` 或 `docker-compose`。
+如果希望后台运行，使用 `.\scripts\start_stack.ps1 -Detach`。
+
+中国网络环境下，Docker 构建默认使用阿里云 Ubuntu/PyPI 镜像和清华
+CRAN 镜像，并对 APT、R 和 Python 下载自动重试。可以在 `.env` 中通过
+`UBUNTU_MIRROR`、`CRAN_MIRROR`、`BIOCONDUCTOR_MIRROR` 和
+`PIP_INDEX_URL` 单独替换。Bioconductor 默认使用官方镜像列表中的 Posit
+节点，以兼顾历史版本兼容性和中国网络下的下载稳定性。
 
 打开 `http://127.0.0.1:8001`。同一台电脑上的其他项目仍可继续使用 `127.0.0.1:8000`。
 
 首次用户注册后，建议从 `.env` 删除 `AMPLICON_BOOTSTRAP_INVITE`，以后按需单独生成邀请码：
 
 ```powershell
-docker compose exec amplicon-web python scripts/manage_access.py `
+docker-compose exec amplicon-web python scripts/manage_access.py `
   --workspace /workspace create-invite --uses 1 --days 14 --label internal-test
 ```
 
@@ -120,13 +130,17 @@ Linux Worker 还会对 R 子进程设置地址空间、CPU 时间和打开文件
 
 ## 模型额度与自带密钥
 
-统计分析和固定报告不依赖模型。模型只用于连接测试和结果解读。
+统计分析和固定报告不依赖模型。模型用于用户主动发起的数据问题对话、metadata 修正建议、连接测试和结果解读。
 
-- 共享模型：运营者通过环境变量配置，默认每用户每月 10 次；
+- 共享模型：运营者通过环境变量配置，实际费用与供应商额度扣在运营者配置的 `MODEL_API_KEY` 所属账户，默认每用户每月 10 次；
 - 自带密钥（BYOK）：用户在网页填写，密钥只存在当前浏览器会话和本次 HTTP 请求中，不写入数据库、日志或报告；
 - BYOK 调用不占共享额度；
+- 共享调用只有成功后才计入月度用量；失败调用会释放额度；
+- 每次成功的 AI 对话、结果解读或连接测试各计 1 次；
 - 共享额度用完后，用户仍可使用自己的密钥；
 - 自定义模型地址默认必须是 HTTPS；生产部署建议通过 `MODEL_ALLOWED_HOSTS` 设置域名白名单。
+
+数据检查阶段的模型上下文只包含 metadata 的列名、取值概况、检查信息和有限代表行，不包含完整丰度矩阵。默认最多发送 40 个代表行、15 列，优先保留用户指定的分组、批次和梯度列；可通过 `AI_METADATA_MAX_ROWS` 和 `AI_METADATA_MAX_COLUMNS` 调小。模型只能生成修正预览；用户确认后系统生成新副本、保留原文件并再次执行确定性检查。
 
 服务端共享模型：
 
@@ -174,6 +188,10 @@ PUBLIC_BASE_URL=https://你的域名
 - `GET /api/auth/me`；
 - `DELETE /api/me/data`、`DELETE /api/me/account`；
 - `POST /api/uploads/inspect`；
+- `POST /api/uploads/{id}/reinspect`；
+- `POST /api/assistant/chat`；
+- `POST /api/uploads/{id}/metadata/apply`；
+- `GET /api/uploads/{id}/metadata/corrected`；
 - `POST /api/plans`、`GET /api/plans`；
 - `POST /api/plans/{id}/approve`；
 - `POST /api/plans/{id}/run`；

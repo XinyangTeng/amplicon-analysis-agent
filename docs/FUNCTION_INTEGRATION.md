@@ -1,6 +1,7 @@
 # Analysis function integration
 
-The repository contains 55 team-authorized R analysis functions under `r/functions/`.
+The repository contains 55 team-authorized R analysis functions plus independently implemented
+extension functions under `r/functions/`.
 They are ordinary executable scripts, not a separately named package layer.
 
 ## Runtime contract
@@ -19,6 +20,12 @@ network analysis, assembly models, source contribution, and predicted-function a
 The thin function scripts select one method and result directory. This avoids hidden
 package wrappers while keeping every function independently callable and auditable.
 
+The lightweight compositional-network extension follows published microbial-network workflow stages
+(filtering, zero handling, transformation, association, sparsification, property analysis and
+group comparison) but does not copy or import external package source code. It uses installed base
+dependencies (`igraph` and R statistics), which avoids optional dependency conflicts.
+Method provenance and limitations remain visible in output tables.
+
 ## Compatibility states
 
 - `verified`: completed a compatibility smoke test.
@@ -29,6 +36,9 @@ package wrappers while keeping every function independently callable and auditab
 
 Compatibility results are stored in `r/functions/compatibility.json` and exposed through
 `list_amplicon_analysis_functions` and `inspect_amplicon_function`.
+
+Installed package backends and the distinction between user-facing methods, shared utilities,
+and external-database methods are documented in `docs/R_PACKAGE_METHOD_MAP.md`.
 
 ## Provenance
 

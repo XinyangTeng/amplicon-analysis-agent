@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
+from .function_presentations import CATEGORY_NAMES_ZH, method_name, presentation
+
 
 REPORT_FILES = {"report.html", "report_data.json", "artifact_manifest.json"}
 IMAGE_EXTENSIONS = {".png"}
@@ -18,12 +20,29 @@ LOG_EXTENSIONS = {".log"}
 SECTION_LABELS = {
     "figures": "基础分析",
     "01_alpha_diversity": "Alpha 多样性",
+    "01_alpha_breakaway": "未观测丰富度估计",
     "02_beta_diversity": "Beta 多样性",
+    "02_beta_gunifrac": "Generalized UniFrac",
+    "02_beta_coda_pca": "组成数据分析PCA",
     "03_composition": "群落组成",
     "04_differential": "差异分析",
     "05_network": "网络分析",
+    "05_network_compositional": "组成型关联网络",
+    "05_network_comparison": "组间网络比较",
+    "05_network_spieceasi": "SPIEC-EASI网络",
+    "05_network_wgcna": "WGCNA模块网络",
+    "05_biomarker_lefse": "LEfSe候选标志物",
+    "05_differential_ancombc2": "ANCOM-BC2差异丰度",
+    "05_differential_aldex2": "ALDEx2差异丰度",
+    "05_differential_maaslin2": "MaAsLin2多变量关联",
+    "05_differential_maaslin3": "MaAsLin3多变量关联",
+    "05_differential_linda": "LinDA差异丰度",
+    "05_differential_corncob": "corncob差异丰度",
+    "05_differential_metagenomeseq": "metagenomeSeq差异丰度",
     "06_assembly": "群落构建",
     "07_machine_learning": "机器学习",
+    "07_machine_learning_splsda": "sPLS-DA监督降维",
+    "07_machine_learning_siamcat": "SIAMCAT分类模型",
     "08_function": "功能分析",
 }
 
@@ -150,11 +169,18 @@ def _function_summary(manifest: object) -> dict[str, object]:
                     state = str(result.get("status", "unknown")) if isinstance(result, dict) else "unknown"
                     run_states[str(context)] = state
                     counts[state] += 1
+            category = str(function.get("category", "other"))
+            user_presentation = presentation(str(function_id), category)
             functions.append(
                 {
                     "function_id": str(function_id),
+                    "display_name": function.get("display_name", user_presentation["display_name"]),
+                    "description": function.get("description", user_presentation["description"]),
                     "script": function.get("script"),
                     "category": function.get("category"),
+                    "category_name": function.get(
+                        "category_name", CATEGORY_NAMES_ZH.get(category, category)
+                    ),
                     "runs": run_states,
                 }
             )
@@ -308,7 +334,7 @@ def _stratified_html(results: object) -> str:
 def _function_html(summary: dict[str, object]) -> str:
     functions = summary.get("functions", [])
     if not isinstance(functions, list) or not functions:
-        return "<p>本次未请求扩展分析函数。</p>"
+        return "<p>本次未请求扩展分析方法。</p>"
     rows: list[str] = []
     for function in functions:
         if not isinstance(function, dict):
@@ -317,13 +343,14 @@ def _function_html(summary: dict[str, object]) -> str:
         run_text = "；".join(f"{name}: {state}" for name, state in runs.items()) if isinstance(runs, dict) else ""
         rows.append(
             "<tr>"
-            f"<td>{html.escape(str(function.get('function_id', '')))}</td>"
-            f"<td>{html.escape(str(function.get('category', '')))}</td>"
+            f"<td><strong>{html.escape(str(function.get('display_name', '')))}</strong>"
+            f"<br><small>{html.escape(str(function.get('description', '')))}</small></td>"
+            f"<td>{html.escape(str(function.get('category_name', '')))}</td>"
             f"<td>{html.escape(run_text)}</td>"
             "</tr>"
         )
     return (
-        "<table><thead><tr><th>分析函数</th><th>类别</th><th>各批次状态</th></tr></thead>"
+        "<table><thead><tr><th>分析方法</th><th>类别</th><th>各批次状态</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table>"
     )
 
@@ -434,6 +461,7 @@ def _render_html(data: dict[str, object]) -> str:
     warning_html = "".join(f"<li>{html.escape(str(item))}</li>" for item in warnings) or "<li>无</li>"
     plan_id = html.escape(str(contract.get("plan_id", "unknown"))) if isinstance(contract, dict) else "unknown"
     functions = contract.get("functions", []) if isinstance(contract, dict) else []
+    function_names = [method_name(str(item)) for item in functions]
     project_design = contract.get("project_design", {}) if isinstance(contract, dict) else {}
     qc_cards = ""
     if isinstance(qc, dict) and qc:
@@ -491,7 +519,7 @@ a{{color:#087443}} details{{border-top:1px solid var(--line);padding:10px 0}} su
   <p>分组列：<code>{html.escape(str(contract.get("group_column")))}</code>；
   批次列：<code>{html.escape(str(contract.get("batch_column")))}</code>；
   梯度列：<code>{html.escape(str(contract.get("gradient_column")))}</code>。</p>
-  <p>执行函数：{html.escape("、".join(map(str, functions)))}</p>
+  <p>分析方法：{html.escape("、".join(function_names))}</p>
   <p>研究问题：{html.escape(str(project_design.get("research_question", "未记录")))}</p>
   <p>对照：{html.escape(str(project_design.get("controls", "未记录")))}；
   处理：{html.escape(str(project_design.get("treatments", "未记录")))}；
@@ -503,7 +531,7 @@ a{{color:#087443}} details{{border-top:1px solid var(--line);padding:10px 0}} su
   <p>下列数值由统计脚本直接读取并排版，未经过语言模型改写。</p>
   {_stratified_html(data.get("statistical_results", {}).get("stratified_tests", {}))}
 </section>
-<section class="panel"><h2>4. 扩展分析函数执行状态</h2>{_function_html(function_execution)}</section>
+<section class="panel"><h2>4. 扩展分析方法执行状态</h2>{_function_html(function_execution)}</section>
 <section class="panel"><h2>5. 项目化结果解读</h2>
   {_interpretation_html(data.get("interpretation"))}
 </section>

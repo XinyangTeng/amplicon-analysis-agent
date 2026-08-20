@@ -1,5 +1,9 @@
 .git
 .github
+.agents
+.claude
+.codex
+.venv
 .pytest_cache
 .ruff_cache
 __pycache__
@@ -13,3 +17,10 @@ runs
 tmp
 tests
 examples
+docs
+blocked_functions_smoke.json
+bnti_smoke.json
+final_two_smoke.json
+function_smoke_summary*.json
+neutral_refit_smoke.json
+repaired_special_smoke.json

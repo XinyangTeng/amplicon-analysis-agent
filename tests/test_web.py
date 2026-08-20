@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -103,10 +104,12 @@ def test_public_landing_auth_gate_and_registry(client: TestClient) -> None:
     assert client.get("/app").status_code == 200
     health = client.get("/api/health").json()
     assert health["status"] == "ok"
-    assert health["version"] == "0.4.0"
+    assert health["version"] == "0.6.0"
     functions = client.get("/api/functions").json()
     assert functions["baseline"] == ["qc", "alpha", "beta", "composition"]
-    assert len(functions["functions"]) == 55
+    assert len(functions["functions"]) == 72
+    assert all(item["display_name"] != item["function_id"] for item in functions["functions"])
+    assert all(item["description"] for item in functions["functions"])
 
 
 def test_invite_is_single_use_and_csrf_is_required(client: TestClient) -> None:
@@ -146,6 +149,103 @@ def test_inspect_prepare_and_user_isolation(client: TestClient) -> None:
     second = register_user(client, email="two@example.org")
     assert second["user_id"] != first["user_id"]
     assert client.get(f"/api/plans/{plan['plan_id']}").status_code == 404
+
+
+def test_group_column_is_required_and_can_be_reinspected(client: TestClient) -> None:
+    register_user(client)
+    example = ROOT / "examples" / "demo"
+    with (
+        (example / "abundance.csv").open("rb") as abundance,
+        (example / "taxonomy.csv").open("rb") as taxonomy,
+        (example / "metadata.csv").open("rb") as metadata,
+    ):
+        missing = client.post(
+            "/api/uploads/inspect",
+            files={
+                "abundance": ("abundance.csv", abundance, "text/csv"),
+                "taxonomy": ("taxonomy.csv", taxonomy, "text/csv"),
+                "metadata": ("metadata.csv", metadata, "text/csv"),
+            },
+        )
+    assert missing.status_code == 422
+    assert "提交内容不完整" in missing.json()["detail"]
+
+    upload = upload_demo(client)
+    response = client.post(
+        f"/api/uploads/{upload['upload_id']}/reinspect",
+        json={"group_column": "Site"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["inspection"]["groups"] == {"A": 3, "B": 3}
+
+
+def test_ai_metadata_preview_requires_confirmation_and_preserves_original(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    register_user(client)
+    upload = upload_demo(client)
+    proposal = {
+        "summary": "将英文分组值规范为中文，并保留 Sample ID。",
+        "recommended_group_column": "Group",
+        "recommended_batch_column": None,
+        "recommended_gradient_column": None,
+        "column_renames": [
+            {"source": "Group", "target": "分组", "reason": "便于中文用户理解"}
+        ],
+        "value_mappings": [
+            {
+                "column": "Group",
+                "mapping": {"Control": "对照", "Treatment": "处理"},
+                "reason": "统一分组名称",
+            }
+        ],
+        "sample_group_assignments": [],
+        "controls": ["对照"],
+        "treatments": ["处理"],
+        "research_question": "处理是否改变根际微生物群落？",
+        "sample_type": "根际土",
+        "gradient_direction": "",
+        "design_notes": "使用对照组作为参照。",
+        "questions": [],
+        "warnings": [],
+    }
+    monkeypatch.setattr(
+        "amplicon_agent.web._model_call",
+        lambda **kwargs: json.dumps(
+            {"reply": "已生成安全修正预览，请核对后决定是否应用。", "metadata_proposal": proposal},
+            ensure_ascii=False,
+        ),
+    )
+    chat = client.post(
+        "/api/assistant/chat",
+        json={
+            "message": "请帮我规范分组名称",
+            "upload_id": upload["upload_id"],
+            "group_column": "Group",
+        },
+    )
+    assert chat.status_code == 200, chat.text
+    draft = chat.json()["metadata_draft"]
+    assert draft["proposal"]["recommended_group_column"] == "分组"
+    assert draft["preview_rows"][0]["SampleID"] == "S1"
+
+    rejected = client.post(
+        f"/api/uploads/{upload['upload_id']}/metadata/apply",
+        json={"draft_id": draft["draft_id"], "accepted": False},
+    )
+    assert rejected.status_code == 400
+    applied = client.post(
+        f"/api/uploads/{upload['upload_id']}/metadata/apply",
+        json={"draft_id": draft["draft_id"], "accepted": True},
+    )
+    assert applied.status_code == 200, applied.text
+    result = applied.json()
+    assert result["group_column"] == "分组"
+    assert result["inspection"]["groups"] == {"对照": 3, "处理": 3}
+    download = client.get(result["download_url"])
+    assert download.status_code == 200
+    assert "SampleID" in download.text
 
 
 def test_byok_secret_is_request_only_and_does_not_use_shared_quota(

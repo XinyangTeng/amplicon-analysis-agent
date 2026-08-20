@@ -155,7 +155,7 @@ mytheme1 <- res[[1]]
 amplicon_alpha_path <- file.path(amplicon_path, "01_alpha_diversity")
 dir.create(amplicon_alpha_path, recursive = TRUE, showWarnings = FALSE)
 alpha_xlsx_path <- file.path(amplicon_alpha_path, "alpha_diversity_results.xlsx")
-amplicon_alpha_wb <- openxlsx::createWorkbook()
+amplicon_alpha_wb <- open_amp_workbook(alpha_xlsx_path)
 
 set.seed(seed_value)
 tab <- alpha.micro(ps = ps.16s, group = group_col)
@@ -194,18 +194,7 @@ data <- cbind(
 data$ID <- as.character(data$ID)
 
 target_cols <- 3:(2 + length(all.alpha))
-result <- tryCatch(
-  MuiKwWlx2(data = data, num = target_cols),
-  error = function(e) {
-    message("Statistical annotation failed; continuing without significance labels. Reason: ", conditionMessage(e))
-    data.frame(
-      index = all.alpha,
-      status = "statistical annotation skipped",
-      reason = conditionMessage(e),
-      stringsAsFactors = FALSE
-    )
-  }
-)
+result <- amp_alpha_tests(data, all.alpha, group_col = "group")
 
 # -------------- 缂佹ê娴橀崺铏诡攨鐏炲倹鐎?--------------
 
@@ -214,62 +203,40 @@ fix_overlap_theme <- ggplot2::theme(
   axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1, color = "black")
 )
 
-if (!"status" %in% colnames(result)) {
-  result1 <- FacetMuiPlotresultBox2(
-    data     = data,
-    num      = target_cols,
-    result   = result,
-    sig_show = sig_method,
-    ncol     = plot_ncol
-  )
+plot_data <- tidyr::pivot_longer(data, cols = dplyr::all_of(all.alpha), names_to = "index", values_to = "value") %>%
+  dplyr::filter(is.finite(value))
+plot_data$group <- factor(plot_data$group, levels = axis_order)
+test_labels <- amp_alpha_test_labels(result, facet_col = "index")
 
-  p1_1_base <- result1[[1]] +
-    ggplot2::scale_x_discrete(limits = axis_order) +
-    theme_nature() +
-    fix_overlap_theme +
-    ggplot2::labs(x = x_label) +
-    ggplot2::guides(fill = guide_legend(title = NULL))
+p1_1_base <- ggplot2::ggplot(plot_data, ggplot2::aes(x = group, y = value, fill = group, color = group)) +
+  ggplot2::geom_boxplot(width = 0.65, outlier.shape = NA, alpha = 0.75) +
+  ggplot2::geom_jitter(width = 0.12, size = 1.8, alpha = 0.8) +
+  ggplot2::geom_text(
+    data = test_labels, ggplot2::aes(x = 1, y = Inf, label = label),
+    inherit.aes = FALSE, hjust = 0, vjust = 1.2, size = 3
+  ) +
+  ggplot2::facet_wrap(~ index, scales = "free_y", ncol = plot_ncol) +
+  theme_nature() +
+  fix_overlap_theme +
+  ggplot2::labs(x = x_label, y = "Alpha diversity") +
+  ggplot2::guides(fill = guide_legend(title = NULL), color = guide_legend(title = NULL))
 
-  res2 <- FacetMuiPlotresultBar(
-    data     = data,
-    num      = target_cols,
-    result   = result,
-    sig_show = sig_method,
-    ncol     = plot_ncol
-  )
+bar_data <- plot_data %>%
+  dplyr::group_by(group, index) %>%
+  dplyr::summarise(value = mean(value), se = stats::sd(value) / sqrt(dplyr::n()), .groups = "drop")
 
-  p1_2_base <- res2[[1]] +
-    ggplot2::scale_x_discrete(limits = axis_order) +
-    theme_nature() +
-    fix_overlap_theme +
-    ggplot2::labs(x = x_label) +
-    ggplot2::guides(fill = guide_legend(title = NULL))
-} else {
-  plot_data <- tidyr::pivot_longer(data, cols = dplyr::all_of(all.alpha), names_to = "index", values_to = "value")
-  plot_data$group <- factor(plot_data$group, levels = axis_order)
-
-  p1_1_base <- ggplot2::ggplot(plot_data, ggplot2::aes(x = group, y = value, fill = group, color = group)) +
-    ggplot2::geom_boxplot(width = 0.65, outlier.shape = NA, alpha = 0.75) +
-    ggplot2::geom_jitter(width = 0.12, size = 1.8, alpha = 0.8) +
-    ggplot2::facet_wrap(~ index, scales = "free_y", ncol = plot_ncol) +
-    theme_nature() +
-    fix_overlap_theme +
-    ggplot2::labs(x = x_label, y = "Alpha diversity") +
-    ggplot2::guides(fill = guide_legend(title = NULL), color = guide_legend(title = NULL))
-
-  bar_data <- plot_data %>%
-    dplyr::group_by(group, index) %>%
-    dplyr::summarise(value = mean(value, na.rm = TRUE), se = stats::sd(value, na.rm = TRUE) / sqrt(dplyr::n()), .groups = "drop")
-
-  p1_2_base <- ggplot2::ggplot(bar_data, ggplot2::aes(x = group, y = value, fill = group)) +
-    ggplot2::geom_col(width = 0.68, alpha = 0.85) +
-    ggplot2::geom_errorbar(ggplot2::aes(ymin = value - se, ymax = value + se), width = 0.2) +
-    ggplot2::facet_wrap(~ index, scales = "free_y", ncol = plot_ncol) +
-    theme_nature() +
-    fix_overlap_theme +
-    ggplot2::labs(x = x_label, y = "Mean alpha diversity") +
-    ggplot2::guides(fill = guide_legend(title = NULL))
-}
+p1_2_base <- ggplot2::ggplot(bar_data, ggplot2::aes(x = group, y = value, fill = group)) +
+  ggplot2::geom_col(width = 0.68, alpha = 0.85) +
+  ggplot2::geom_errorbar(ggplot2::aes(ymin = value - se, ymax = value + se), width = 0.2) +
+  ggplot2::geom_text(
+    data = test_labels, ggplot2::aes(x = 1, y = Inf, label = label),
+    inherit.aes = FALSE, hjust = 0, vjust = 1.2, size = 3
+  ) +
+  ggplot2::facet_wrap(~ index, scales = "free_y", ncol = plot_ncol) +
+  theme_nature() +
+  fix_overlap_theme +
+  ggplot2::labs(x = x_label, y = "Mean alpha diversity") +
+  ggplot2::guides(fill = guide_legend(title = NULL))
 
 
 # -------------- color theme --------------
@@ -294,7 +261,7 @@ if (color_theme == "npg") {
 
 # ===================== 4. 缂佹挻鐏夋潏鎾冲毉娑撳酣顣╃憴?=====================
 
-ggplot2::ggsave("preview.png", plot = p1_1, width = save_w, height = save_h, dpi = 150, limitsize = FALSE, bg = "white")
+save_preview_plot(p1_1, width = save_w, height = save_h)
 message("Preview saved: preview.png")
 
 save_plot2(p1_1, amplicon_alpha_path, "alpha_diversity_box", width = save_w, height = save_h, dpi = save_dpi)

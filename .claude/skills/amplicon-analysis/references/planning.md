@@ -7,9 +7,16 @@ After inspection, show a concise design contract and explicitly ask for correcti
 Selection rules:
 
 - Always: QC, alpha, beta and composition.
-- Differential abundance: replicated contrasts with a confirmed reference.
+- Differential abundance: replicated contrasts with a confirmed reference. Prefer a small,
+  justified method panel rather than every installed method; add MaAsLin only for confirmed
+  covariates/random effects and corncob when differential variability is part of the question.
 - Biomarker/ML: at least 10 samples per group; prefer held-out/nested validation and label exploratory results.
-- Network: at least 10 samples per stratum; group comparison needs adequate samples per group.
+- Network: use compositional construction for at least 10 independent samples in a stratum;
+  two-group comparison requires at least 10 per selected group and a confirmed contrast, with
+  20+ per group preferred. Skip inference when filtering leaves fewer than four taxa. Never
+  describe an association edge as a demonstrated microbial interaction.
 - Assembly: phylogenetic methods require a tree; source tracking requires confirmed roles.
 - Functional prediction: requires KO annotation and must be labelled predicted.
+- Tax4Fun2: additionally requires representative sequences and an available reference database.
+- PICRUSt2 downstream analysis: requires genuine PICRUSt2 output tables, not ASV taxonomy alone.
 - Gradients: use trend models, not unrelated pairwise tests.

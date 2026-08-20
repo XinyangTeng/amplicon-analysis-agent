@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="BioAgent 隐私政策与研究数据处理说明">
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/style.css?v=5">
+  <link rel="stylesheet" href="/assets/style.css?v=7">
   <title>隐私政策｜BioAgent</title>
 </head>
 <body class="policy-page">
@@ -14,7 +14,7 @@
     <nav><a href="/">返回介绍页</a><a class="button compact" href="/login">登录</a></nav>
   </header>
   <main class="policy-document">
-    <p class="eyebrow">PRIVACY POLICY</p>
+    <p class="eyebrow">隐私政策</p>
     <h1>隐私政策与研究数据处理说明</h1>
     <p class="policy-updated">雏形版本 · 面向邀请制测试。正式上线前应由实际运营主体完成法律审阅并补充主体信息。</p>
 
@@ -25,7 +25,7 @@
     <p>上述信息仅用于身份验证、隔离个人工作区、执行你审批的分析、提供结果报告、控制资源和模型额度、定位运行错误以及执行数据删除。</p>
 
     <h2>3. 模型服务与第三方传输</h2>
-    <p>统计计算不调用大模型。只有当你主动点击“模型解读”或“测试连接”时，系统才会调用所选模型接口。结果解读发送的是实验设计和已校验的结构化结果摘要，不发送原始丰度表。若使用站点共享模型，数据会发送给站点配置的模型提供商；若填写自己的 API Key，密钥只在当前浏览器会话和本次请求内使用，不写入应用数据库或报告。</p>
+    <p>统计计算不调用大模型。只有当你主动在 AI 助手中发送消息、点击“模型解读”或“测试连接”时，系统才会调用所选模型接口。数据检查阶段仅发送 metadata 的列结构、取值摘要和有限代表行，不发送完整丰度矩阵；结果解读发送实验设计和已校验的结构化结果摘要。若使用站点共享模型，以上内容会发送给站点配置的模型提供商；若填写自己的 API Key，密钥只在当前浏览器会话和本次请求内使用，不写入应用数据库或报告。共享额度只在模型调用成功后扣除。</p>
 
     <h2>4. 保存期限与自动删除</h2>
     <p>当前默认保留期为 <strong>{{RETENTION_DAYS}} 天</strong>。上传、分析计划和结果到期后由后台任务自动删除。实际部署可调整保留期，账户页会显示当前账户的期限。</p>

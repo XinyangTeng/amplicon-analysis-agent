@@ -47,7 +47,7 @@ def workspace_scope(path: Path) -> Iterator[Path]:
         resolved.relative_to(global_root)
     except ValueError as exc:
         raise PathSecurityError(
-            f"User workspace is outside AMPLICON_WORKSPACE: {resolved}"
+            f"用户工作区超出 AMPLICON_WORKSPACE：{resolved}"
         ) from exc
     resolved.mkdir(parents=True, exist_ok=True)
     token = _workspace_override.set(resolved)
@@ -66,7 +66,7 @@ def secure_path(value: str | Path, *, must_exist: bool = True) -> Path:
     try:
         candidate.relative_to(root)
     except ValueError as exc:
-        raise PathSecurityError(f"Path is outside AMPLICON_WORKSPACE: {candidate}") from exc
+        raise PathSecurityError(f"路径超出 AMPLICON_WORKSPACE：{candidate}") from exc
     if must_exist and not candidate.exists():
         raise FileNotFoundError(candidate)
     return candidate

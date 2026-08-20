@@ -70,6 +70,34 @@ def test_shared_model_quota_and_byok_accounting(
     assert store.user_summary(user)["monthly_model_remaining"] == 0
 
 
+def test_failed_shared_model_call_is_not_charged(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AMPLICON_WORKSPACE", str(tmp_path))
+    monkeypatch.setenv("AMPLICON_MONTHLY_MODEL_QUOTA", "1")
+    store = AuthStore()
+    user = create_user(store, "refund@example.org")
+
+    failed = store.reserve_model_call(
+        user=user,
+        provider="qwen",
+        use_server_key=True,
+    )
+    store.finish_model_call(failed, succeeded=False)
+    summary = store.user_summary(user)
+    assert summary["monthly_model_used"] == 0
+    assert summary["monthly_model_remaining"] == 1
+
+    retry = store.reserve_model_call(
+        user=user,
+        provider="qwen",
+        use_server_key=True,
+    )
+    store.finish_model_call(retry, succeeded=True)
+    assert store.user_summary(user)["monthly_model_remaining"] == 0
+
+
 def test_expired_upload_is_removed_by_cleanup_task(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -99,4 +127,3 @@ def test_expired_upload_is_removed_by_cleanup_task(
         resource_id=upload_id,
         user_id=user.user_id,
     )
-
