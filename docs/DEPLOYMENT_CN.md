@@ -57,13 +57,20 @@ MODEL_ALLOWED_HOSTS=dashscope.aliyuncs.com,api.deepseek.com
 
 ## 官方依据与办理入口
 
-- 工业和信息化部：《非经营性互联网信息服务备案管理办法》  
+- 工业和信息化部：《非经营性互联网信息服务备案管理办法》
+
   https://www.miit.gov.cn/gyhxxhb/jgsj/cyzcyfgs/bmgz/xxtxl/art/2024/art_84a0cfa0ebd049bbbe751dca9a008e56.html
-- 工业和信息化部备案管理系统  
+
+- 工业和信息化部备案管理系统
+
   https://beian.miit.gov.cn/
-- 全国人大：《中华人民共和国个人信息保护法》  
+
+- 全国人大：《中华人民共和国个人信息保护法》
+
   https://www.npc.gov.cn/npc/c2/c30834/202108/t20210820_313088.html
-- 中央网信办：《计算机信息网络国际联网安全保护管理办法》  
+
+- 中央网信办：《计算机信息网络国际联网安全保护管理办法》
+
   https://www.cac.gov.cn/2014-10/08/c_1112737294.htm
 
 本清单是工程准备说明，不替代针对实际运营主体、数据内容和商业模式的法律意见。
