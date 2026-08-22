@@ -5,7 +5,6 @@ import os
 import re
 import secrets
 import shutil
-import subprocess
 import uuid
 from pathlib import Path
 
@@ -18,7 +17,7 @@ from .store import PlanStore
 from .function_registry import get_function, function_registry, FUNCTION_ROOT
 from .function_specs import assess_context
 from .report_builder import build_analysis_report
-from .resource_limits import subprocess_limit_kwargs, subprocess_timeout_seconds
+from .resource_limits import run_subprocess, subprocess_timeout_seconds
 from .runtime_paths import R_ROOT
 
 
@@ -197,11 +196,9 @@ class AgentService:
         log_path = log_dir / "r-analysis.log"
         command = [rscript, str(script), str(run_dir / "analysis_contract.json"), str(run_dir)]
         try:
-            completed = subprocess.run(
-                command, capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=subprocess_timeout_seconds(), check=False,
+            completed = run_subprocess(
+                command, timeout=subprocess_timeout_seconds(),
                 env=r_subprocess_environment(),
-                **subprocess_limit_kwargs(),
             )
             log_path.write_text(completed.stdout + "\n--- STDERR ---\n" + completed.stderr, encoding="utf-8")
             if completed.returncode != 0:
@@ -333,6 +330,24 @@ class AgentService:
             "truncated": len(frame) > limit,
         }
 
+    def report_artifact(self, plan_id: str, relative_path: str) -> Path:
+        """Resolve one report-linked file (figure, table, log, manifest) inside the run directory.
+
+        The report HTML links to files via paths relative to the run directory
+        (e.g. ``figures/x.png``). This resolves and contains such a path so it can
+        be served back over HTTP without allowing escape from the run directory.
+        """
+        contract = self.store.load(plan_id)
+        if not contract.run_directory:
+            raise ValueError("分析计划尚未运行")
+        run_dir = secure_path(contract.run_directory).resolve()
+        path = secure_path(run_dir / relative_path).resolve()
+        if run_dir != path and run_dir not in path.parents:
+            raise ValueError("请求的文件必须位于本次运行目录内")
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        return path
+
     def save_interpretation(self, plan_id: str, interpretation: dict[str, object]) -> dict:
         """Persist a validated, project-specific LLM interpretation and rebuild the fixed report."""
         validation = self.validate(plan_id)
@@ -446,11 +461,9 @@ class AgentService:
                         "status": "skipped", "reason": eligibility["reason"]
                     }
                     continue
-                completed = subprocess.run(
-                    [rscript, str(script)], cwd=workspace, env=env,
-                    capture_output=True, text=True, encoding="utf-8", errors="replace",
-                    timeout=subprocess_timeout_seconds(), check=False,
-                    **subprocess_limit_kwargs(),
+                completed = run_subprocess(
+                    [rscript, str(script)], cwd=str(workspace), env=env,
+                    timeout=subprocess_timeout_seconds(),
                 )
                 log_name = f"{function_id}--{context_name}.log"
                 (logs / log_name).write_text(

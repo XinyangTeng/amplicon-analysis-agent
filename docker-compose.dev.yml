@@ -1,0 +1,6 @@
+services:
+  amplicon-web:
+    environment:
+      AMPLICON_STATIC_DIR: /app-dev/web_static
+    volumes:
+      - ./src/amplicon_agent/web_static:/app-dev/web_static:ro

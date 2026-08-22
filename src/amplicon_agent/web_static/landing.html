@@ -7,72 +7,76 @@
   <meta name="description" content="BioAgent 将扩增子微生物组分析整理为先检查、后计划、再审批、可追溯的研究流程。">
   <link rel="canonical" href="{{CANONICAL_URL}}">
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/style.css?v=7">
+  <link rel="stylesheet" href="/assets/style.css?v=8">
   <title>BioAgent｜可审计的扩增子分析工作流</title>
 </head>
 <body class="public-page">
   <header class="public-nav">
-    <a class="brand" href="/">
-      <img src="/assets/icon.svg" alt="">
-      <span><strong>BioAgent</strong><small>扩增子分析工作流</small></span>
-    </a>
-    <nav aria-label="主要导航">
-      <a href="#workflow">工作方式</a>
-      <a href="#safety">数据安全</a>
-      <a href="/privacy">隐私政策</a>
-      <a class="button compact" href="/login">邀请码登录</a>
-    </nav>
+    <div class="nav-inner">
+      <a class="brand" href="/">
+        <img src="/assets/icon.svg" alt="">
+        <strong>BioAgent</strong>
+      </a>
+      <nav aria-label="主要导航">
+        <a href="#workflow">流程</a>
+        <a href="#scope">分析范围</a>
+        <a href="#safety">数据安全</a>
+        <a class="button compact" href="/login">邀请码登录</a>
+      </nav>
+    </div>
   </header>
 
   <main class="public-main">
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">先计划 · 可审计 · 可复现</p>
-        <h1>把扩增子分析，变成一个可核对的研究流程</h1>
-        <p class="hero-lead">上传 ASV 三表后，系统先检查数据和实验设计，再生成分析计划。只有你确认后才执行固定统计函数，最后自动校验并整理为可解释报告。</p>
+        <p class="tagline">邀请制内测</p>
+        <h1>扩增子分析，<br><mark>每一步都可核对</mark></h1>
+        <p class="hero-lead">上传三表，检查、计划、审批、运行。统计由固定 R 函数完成，模型只负责解释。</p>
         <div class="hero-actions">
           <a class="button primary" href="/login">使用邀请码进入</a>
           <a class="button ghost" href="#workflow">查看流程</a>
         </div>
-        <p class="invitation-note">当前为邀请制内测，主要服务中文科研用户。</p>
       </div>
       <div class="hero-console" aria-label="分析流程概览">
-        <div class="console-head"><span></span><span></span><span></span><b>研究任务</b></div>
+        <p class="console-head">当前任务</p>
         <ol>
-          <li class="complete"><b>01</b><span>上传三表并指定分组<small>样本对应、重复、分类层级、阻断项</small></span></li>
-          <li class="complete"><b>02</b><span>确认实验设计<small>研究问题、处理、参照、梯度与批次</small></span></li>
-          <li class="active"><b>03</b><span>生成并审批计划<small>分析范围、参数、预计产物</small></span></li>
-          <li><b>04</b><span>运行、校验与解读<small>固定函数计算，模型只解释证据</small></span></li>
+          <li class="complete"><b>✓</b><span>上传三表并指定分组</span></li>
+          <li class="complete"><b>✓</b><span>确认实验设计</span></li>
+          <li class="active"><b>03</b><span>生成并审批计划</span></li>
+          <li><b>04</b><span>运行、校验与解读</span></li>
         </ol>
+        <div class="console-foot"><span>审批码一次性有效</span><span>输入变更即失效</span></div>
       </div>
     </section>
 
     <section class="proof-strip" aria-label="核心特性">
       <div><strong>55</strong><span>个已登记分析函数</span></div>
-      <div><strong>1 次</strong><span>一次性人工审批</span></div>
+      <div><strong>1 次</strong><span>人工审批后执行</span></div>
       <div><strong>0</strong><span>模型参与数值计算</span></div>
-      <div><strong>全程</strong><span>参数、版本与结果可追溯</span></div>
+      <div><strong>全程</strong><span>参数与结果可追溯</span></div>
     </section>
 
     <section id="workflow" class="public-section">
       <div class="section-heading-public">
-        <p class="eyebrow">工作方式</p>
-        <h2>不是“一键黑箱”，而是四个可核对阶段</h2>
-        <p>Agent 负责把研究问题转译为清晰计划；统计分析仍由经过登记和校验的函数执行。</p>
+        <div>
+          <p>工作方式</p>
+          <h2>四个阶段，不是一键黑箱</h2>
+        </div>
+        <p>Agent 把研究问题转成计划，计算交给已登记的统计函数。</p>
       </div>
       <div class="feature-grid">
-        <article><span>01</span><h3>先诊断输入</h3><p>自动判断丰度表方向、样本与特征对应、分组重复和分析条件，不合格的数据会在运行前阻断。</p></article>
-        <article><span>02</span><h3>再确认设计</h3><p>明确样本类型、处理与参照、梯度和批次，决定做全套分析还是只回答当前科学问题。</p></article>
-        <article><span>03</span><h3>审批后执行</h3><p>计划使用一次性审批码。输入或参数变化后旧审批立即失效，避免误跑和不可追溯的修改。</p></article>
-        <article><span>04</span><h3>校验后解释</h3><p>右侧 AI 助手可在检查和运行阶段按需对话；报告解读只读取已校验摘要，区分证据、推断与局限。</p></article>
+        <article><span>01</span><h3>先诊断输入</h3><p>表方向、样本对应、分组重复自动判断，不合格数据运行前阻断。</p></article>
+        <article><span>02</span><h3>再确认设计</h3><p>明确处理与参照、梯度和批次，决定分析范围。</p></article>
+        <article><span>03</span><h3>审批后执行</h3><p>一次性审批码；输入或参数一变，旧审批立即失效。</p></article>
+        <article><span>04</span><h3>校验后解释</h3><p>解读只读已校验摘要，区分证据、推断与局限。</p></article>
       </div>
     </section>
 
-    <section class="public-section split-section">
+    <section id="scope" class="split-section">
       <div>
-        <p class="eyebrow">分析范围</p>
+        <p>分析范围</p>
         <h2>从基础生态统计到扩展分析</h2>
-        <p>首个闭环覆盖 QC、Alpha、Beta 和群落组成，并可按数据条件调用差异丰度、机器学习、生物标志物、网络和群落组装等扩展函数。</p>
+        <p>按数据条件自动判断哪些方法可用。</p>
       </div>
       <div class="scope-list">
         <span>数据质控</span><span>Alpha 多样性</span><span>Beta 与 PERMANOVA</span>
@@ -83,26 +87,35 @@
 
     <section id="safety" class="public-section safety-section">
       <div class="section-heading-public">
-        <p class="eyebrow">从设计上保护隐私</p>
-        <h2>内测入口默认按多用户服务设计</h2>
+        <div>
+          <p>数据安全</p>
+          <h2>默认按多用户服务设计</h2>
+        </div>
       </div>
       <div class="safety-grid">
-        <article><h3>邀请制账户</h3><p>未获邀请码不能注册；登录会话使用安全 Cookie，写操作带页面校验。</p></article>
-        <article><h3>用户目录隔离</h3><p>每位用户的上传、计划、运行结果和报告位于独立目录，接口同时检查资源归属。</p></article>
-        <article><h3>受限任务执行</h3><p>分析进入独立任务队列，并设置并发、CPU、内存、运行时长、上传与存储上限。</p></article>
-        <article><h3>到期自动删除</h3><p>数据按账户保留期自动清理，也可随时在工作台删除全部数据或注销账户。</p></article>
+        <article><div><h3>邀请制账户</h3><p>无邀请码不能注册，会话使用安全 Cookie。</p></div></article>
+        <article><div><h3>用户目录隔离</h3><p>上传、计划、结果与报告各自独立存放。</p></div></article>
+        <article><div><h3>受限任务执行</h3><p>并发、CPU、内存、时长与存储均设上限。</p></div></article>
+        <article><div><h3>到期自动删除</h3><p>也可随时手动删除全部数据或注销账户。</p></div></article>
       </div>
     </section>
 
     <section class="cta-panel">
-      <div><p class="eyebrow">邀请制内测</p><h2>已有邀请码？进入分析工作台</h2><p>没有邀请码时，请联系项目维护者申请内测名额。</p></div>
+      <div>
+        <h2>已有邀请码？开始你的第一次分析</h2>
+        <p>没有邀请码请联系项目维护者申请名额。</p>
+      </div>
       <a class="button primary" href="/login">登录或注册</a>
     </section>
   </main>
 
   <footer class="public-footer">
-    <div><strong>BioAgent</strong><p>面向微生物组研究的可审计分析工作流。</p></div>
-    <div><a href="/privacy">隐私政策</a><a href="/login">邀请制入口</a><a href="/api/health">服务状态</a></div>
+    <div>BioAgent · 可审计的扩增子分析工作流</div>
+    <div>
+      <a href="/privacy">隐私政策</a>
+      <a href="/login">邀请制入口</a>
+      <a href="/api/health">服务状态</a>
+    </div>
   </footer>
 </body>
 </html>

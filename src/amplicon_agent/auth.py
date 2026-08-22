@@ -333,50 +333,64 @@ class AuthStore:
         clean_email = _normalize_email(email)
         now = utc_now()
         with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM users WHERE email = ?",
-                (clean_email,),
-            ).fetchone()
-            dummy_salt = bytes.fromhex("00" * 16)
-            candidate = _password_hash(
-                password,
-                bytes.fromhex(row["password_salt"]) if row else dummy_salt,
-            )
-            valid = bool(
-                row
-                and row["status"] == "active"
-                and hmac.compare_digest(candidate, row["password_hash"])
-            )
-            locked = bool(
-                row
-                and row["locked_until"]
-                and parse_time(row["locked_until"]) > now
-            )
-            if locked:
-                valid = False
-            if not valid:
-                if row and not locked:
-                    attempts = int(row["failed_attempts"]) + 1
-                    locked_until = (
-                        iso_time(now + timedelta(minutes=15)) if attempts >= 5 else None
-                    )
-                    connection.execute(
-                        """
-                        UPDATE users
-                        SET failed_attempts = ?, locked_until = ?
-                        WHERE user_id = ?
-                        """,
-                        (0 if locked_until else attempts, locked_until, row["user_id"]),
-                    )
-                raise ValueError("邮箱或密码错误；连续失败 5 次将锁定 15 分钟")
-            connection.execute(
-                """
-                UPDATE users
-                SET failed_attempts = 0, locked_until = NULL, last_login_at = ?
-                WHERE user_id = ?
-                """,
-                (iso_time(now), row["user_id"]),
-            )
+            # BEGIN IMMEDIATE holds the write lock across the read-modify-write of
+            # failed_attempts so concurrent login attempts serialize instead of all
+            # reading the same stale count and undercounting the lockout threshold.
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT * FROM users WHERE email = ?",
+                    (clean_email,),
+                ).fetchone()
+                dummy_salt = bytes.fromhex("00" * 16)
+                candidate = _password_hash(
+                    password,
+                    bytes.fromhex(row["password_salt"]) if row else dummy_salt,
+                )
+                valid = bool(
+                    row
+                    and row["status"] == "active"
+                    and hmac.compare_digest(candidate, row["password_hash"])
+                )
+                locked = bool(
+                    row
+                    and row["locked_until"]
+                    and parse_time(row["locked_until"]) > now
+                )
+                if locked:
+                    valid = False
+                if not valid:
+                    if row and not locked:
+                        attempts = int(row["failed_attempts"]) + 1
+                        locked_until = (
+                            iso_time(now + timedelta(minutes=15)) if attempts >= 5 else None
+                        )
+                        connection.execute(
+                            """
+                            UPDATE users
+                            SET failed_attempts = ?, locked_until = ?
+                            WHERE user_id = ?
+                            """,
+                            (0 if locked_until else attempts, locked_until, row["user_id"]),
+                        )
+                    connection.execute("COMMIT")
+                    raise ValueError("邮箱或密码错误；连续失败 5 次将锁定 15 分钟")
+                connection.execute(
+                    """
+                    UPDATE users
+                    SET failed_attempts = 0, locked_until = NULL, last_login_at = ?
+                    WHERE user_id = ?
+                    """,
+                    (iso_time(now), row["user_id"]),
+                )
+                connection.execute("COMMIT")
+            except ValueError:
+                # Already committed above (the failed-attempt counter must persist
+                # even though this call reports failure) — nothing left to roll back.
+                raise
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
         return self.get_user(row["user_id"])
 
     def create_session(self, user_id: str) -> tuple[str, SessionIdentity]:
