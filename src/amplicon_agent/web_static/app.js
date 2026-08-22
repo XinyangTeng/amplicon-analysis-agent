@@ -648,18 +648,10 @@ function startPolling() {
 
 async function openReport() {
   if (!state.plan) return;
-  const button = $("#report-button");
-  busy(button, true, "正在打开…");
-  try {
-    const response = await request(`/api/plans/${state.plan.plan_id}/report`);
-    const url = URL.createObjectURL(await response.blob());
-    window.open(url, "_blank", "noopener");
-    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch (error) {
-    notify(`报告打开失败：${error.message}`, "error");
-  } finally {
-    busy(button, false);
-  }
+  // Navigate directly (rather than fetching a blob) so the browser has a real
+  // request URL to resolve the report's relative figure/table/download links
+  // against; a blob: URL has no such base and breaks every relative link.
+  window.open(`/api/plans/${state.plan.plan_id}/report/`, "_blank", "noopener");
 }
 
 async function interpretResults() {

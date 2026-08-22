@@ -1,19 +1,23 @@
 from __future__ import annotations
 
+import asyncio
 import html
 import json
+import logging
 import os
 import re
 import secrets
 import shutil
+import time
 import uuid
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any, AsyncIterator
 
 from fastapi import Cookie, Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, SecretStr
 
@@ -37,7 +41,14 @@ from .store import PlanStore
 from .tasks import celery_app, enqueue_analysis
 
 
-STATIC = Path(__file__).with_name("web_static")
+logger = logging.getLogger(__name__)
+
+STATIC = Path(
+    os.getenv(
+        "AMPLICON_STATIC_DIR",
+        str(Path(__file__).with_name("web_static")),
+    )
+).resolve()
 SESSION_COOKIE = "amplicon_session"
 BASELINE_FUNCTIONS = ["qc", "alpha", "beta", "composition"]
 ALLOWED_SUFFIXES = {
@@ -141,7 +152,7 @@ async def security_headers(request: Request, call_next):
         response.headers.setdefault("Cache-Control", "public, max-age=300")
     if "/report" in request.url.path:
         response.headers["Content-Security-Policy"] = (
-            "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; "
+            "default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; "
             "font-src data:; base-uri 'none'; frame-ancestors 'none'"
         )
     else:
@@ -361,6 +372,39 @@ def _delete_user_workspace(user_id: str) -> None:
         shutil.rmtree(target)
 
 
+def _revoke_and_wait_for_jobs(task_ids: list[str], *, timeout: float = 5.0) -> None:
+    """Best-effort stop of a user's running/queued analysis jobs before their
+    workspace is deleted.
+
+    ``celery_app.control.revoke(..., terminate=True)`` only sends SIGTERM; the
+    worker process (and the R subprocess it may have spawned) can take a moment
+    to actually exit, and can still be mid-write when the caller starts
+    deleting the workspace. Waiting here for the task to report ``ready()``
+    narrows that race; it is not a hard guarantee, since a worker that ignores
+    or is slow to act on SIGTERM will still race the delete after ``timeout``.
+    """
+    for task_id in task_ids:
+        try:
+            celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+        except Exception:
+            logger.warning("celery revoke failed for task %s", task_id, exc_info=True)
+    deadline = time.monotonic() + timeout
+    pending = set(task_ids)
+    while pending and time.monotonic() < deadline:
+        pending = {
+            task_id for task_id in pending
+            if not celery_app.AsyncResult(task_id).ready()
+        }
+        if pending:
+            time.sleep(0.2)
+    if pending:
+        logger.warning(
+            "deleting workspace while %d job(s) may still be running: %s",
+            len(pending),
+            sorted(pending),
+        )
+
+
 @app.delete("/api/me/data")
 def delete_my_data(
     request: DeleteRequest,
@@ -368,16 +412,15 @@ def delete_my_data(
 ) -> dict[str, Any]:
     if request.confirmation != "DELETE MY DATA":
         raise HTTPException(400, "确认文本必须为 DELETE MY DATA")
-    store = AuthStore()
-    tasks = store.cancel_user_jobs(identity.user.user_id)
-    for task_id in tasks:
-        try:
-            celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
-        except Exception:
-            pass
-    _delete_user_workspace(identity.user.user_id)
-    store.purge_user_data_records(identity.user.user_id)
-    return {"status": "deleted", "cancelled_tasks": len(tasks)}
+    try:
+        store = AuthStore()
+        tasks = store.cancel_user_jobs(identity.user.user_id)
+        _revoke_and_wait_for_jobs(tasks)
+        _delete_user_workspace(identity.user.user_id)
+        store.purge_user_data_records(identity.user.user_id)
+        return {"status": "deleted", "cancelled_tasks": len(tasks)}
+    except Exception as exc:
+        raise api_error(exc)
 
 
 @app.delete("/api/me/account")
@@ -388,17 +431,16 @@ def delete_my_account(
 ) -> dict[str, str]:
     if request.confirmation != "DELETE MY ACCOUNT":
         raise HTTPException(400, "确认文本必须为 DELETE MY ACCOUNT")
-    store = AuthStore()
-    tasks = store.cancel_user_jobs(identity.user.user_id)
-    for task_id in tasks:
-        try:
-            celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
-        except Exception:
-            pass
-    _delete_user_workspace(identity.user.user_id)
-    store.delete_account(identity.user.user_id)
-    response.delete_cookie(SESSION_COOKIE, path="/")
-    return {"status": "account_deleted"}
+    try:
+        store = AuthStore()
+        tasks = store.cancel_user_jobs(identity.user.user_id)
+        _revoke_and_wait_for_jobs(tasks)
+        _delete_user_workspace(identity.user.user_id)
+        store.delete_account(identity.user.user_id)
+        response.delete_cookie(SESSION_COOKIE, path="/")
+        return {"status": "account_deleted"}
+    except Exception as exc:
+        raise api_error(exc)
 
 
 @app.get("/api/functions")
@@ -514,6 +556,13 @@ def _directory_size(path: Path) -> int:
     return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
 
 
+# Serializes the "measure usage -> write files -> re-check total" sequence in
+# inspect_upload() per user, so two concurrent uploads from the same user can't
+# both pass the quota check before either's bytes are counted. Process-local
+# only: it does not protect against races across multiple worker processes.
+_upload_quota_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+
 async def save_upload(
     upload: UploadFile,
     upload_dir: Path,
@@ -579,38 +628,39 @@ async def inspect_upload(
         raise HTTPException(400, "必须先从 metadata 中选择分组列")
     upload_id = str(uuid.uuid4())
     upload_dir = secure_path(Path("uploads") / upload_id, must_exist=False)
-    existing_bytes = _directory_size(workspace_root())
     user_limit = int(
         os.getenv("AMPLICON_MAX_USER_STORAGE_MB", "2048")
     ) * 1024 * 1024
-    if existing_bytes >= user_limit:
-        raise HTTPException(413, "个人存储空间已满，请先删除历史数据")
-    upload_dir.mkdir(parents=True, exist_ok=False)
     try:
-        paths: dict[str, str] = {}
-        total = 0
-        for role, upload in (
-            ("abundance", abundance),
-            ("taxonomy", taxonomy),
-            ("metadata", metadata),
-        ):
-            paths[role], written = await save_upload(upload, upload_dir, role)
-            total += written
-        if tree and tree.filename:
-            paths["tree"], written = await save_upload(tree, upload_dir, "tree")
-            total += written
-        if representative_sequences and representative_sequences.filename:
-            paths["representative_sequences"], written = await save_upload(
-                representative_sequences,
-                upload_dir,
-                "representative_sequences",
-            )
-            total += written
-        request_limit = int(
-            os.getenv("AMPLICON_MAX_TOTAL_UPLOAD_MB", "500")
-        ) * 1024 * 1024
-        if total > request_limit or existing_bytes + total > user_limit:
-            raise HTTPException(413, "本次上传或个人存储总量超过限制")
+        async with _upload_quota_locks[identity.user.user_id]:
+            existing_bytes = _directory_size(workspace_root())
+            if existing_bytes >= user_limit:
+                raise HTTPException(413, "个人存储空间已满，请先删除历史数据")
+            upload_dir.mkdir(parents=True, exist_ok=False)
+            paths: dict[str, str] = {}
+            total = 0
+            for role, upload in (
+                ("abundance", abundance),
+                ("taxonomy", taxonomy),
+                ("metadata", metadata),
+            ):
+                paths[role], written = await save_upload(upload, upload_dir, role)
+                total += written
+            if tree and tree.filename:
+                paths["tree"], written = await save_upload(tree, upload_dir, "tree")
+                total += written
+            if representative_sequences and representative_sequences.filename:
+                paths["representative_sequences"], written = await save_upload(
+                    representative_sequences,
+                    upload_dir,
+                    "representative_sequences",
+                )
+                total += written
+            request_limit = int(
+                os.getenv("AMPLICON_MAX_TOTAL_UPLOAD_MB", "500")
+            ) * 1024 * 1024
+            if total > request_limit or existing_bytes + total > user_limit:
+                raise HTTPException(413, "本次上传或个人存储总量超过限制")
         (upload_dir / "upload.json").write_text(
             json.dumps(paths, ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -1205,6 +1255,15 @@ def interpret(
 
 
 @app.get("/api/plans/{plan_id}/report")
+def report_legacy_redirect(plan_id: str) -> RedirectResponse:
+    # report.html links to its figures/tables with paths relative to itself
+    # (e.g. "figures/x.png"); those only resolve correctly when the report is
+    # loaded from a URL that ends in "/report/", so callers of the old
+    # no-slash URL are redirected to the canonical one.
+    return RedirectResponse(url=f"/api/plans/{plan_id}/report/")
+
+
+@app.get("/api/plans/{plan_id}/report/")
 def report(
     plan_id: str,
     identity: Annotated[SessionIdentity, Depends(scoped_identity)],
@@ -1220,6 +1279,20 @@ def report(
                 "X-Robots-Tag": "noindex, nofollow",
             },
         )
+    except Exception as exc:
+        raise api_error(exc)
+
+
+@app.get("/api/plans/{plan_id}/report/{artifact_path:path}")
+def report_artifact(
+    plan_id: str,
+    artifact_path: str,
+    identity: Annotated[SessionIdentity, Depends(scoped_identity)],
+):
+    try:
+        _require_plan_owner(plan_id, identity.user.user_id)
+        path = AgentService().report_artifact(plan_id, artifact_path)
+        return FileResponse(path, headers={"X-Robots-Tag": "noindex, nofollow"})
     except Exception as exc:
         raise api_error(exc)
 

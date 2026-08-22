@@ -53,6 +53,29 @@ CRAN 镜像，并对 APT、R 和 Python 下载自动重试。可以在 `.env` �
 
 打开 `http://127.0.0.1:8001`。同一台电脑上的其他项目仍可继续使用 `127.0.0.1:8000`。
 
+## 页面开发热映射
+
+需要频繁修改 `src/amplicon_agent/web_static/` 下的 HTML、CSS 或 JavaScript 时，
+使用开发覆盖配置把本地静态目录只读挂载进 Web 容器。第一次启用需要重建一次，
+让镜像识别 `AMPLICON_STATIC_DIR`：
+
+```powershell
+.\scripts\start_frontend_dev.ps1 -Build
+```
+
+此后保存页面文件后直接刷新浏览器即可，不需要再次重建或重启容器：
+
+```powershell
+.\scripts\start_frontend_dev.ps1
+```
+
+如果浏览器在五分钟内仍显示旧的 CSS/JavaScript，使用 `Ctrl + Shift + R`
+强制刷新。准备正式发布时仍应使用普通生产配置重新构建：
+
+```powershell
+docker-compose up -d --build
+```
+
 首次用户注册后，建议从 `.env` 删除 `AMPLICON_BOOTSTRAP_INVITE`，以后按需单独生成邀请码：
 
 ```powershell
