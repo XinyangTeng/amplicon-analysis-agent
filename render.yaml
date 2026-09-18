@@ -1,0 +1,72 @@
+services:
+  - type: keyvalue
+    name: bioagent-queue
+    plan: starter
+    region: singapore
+    maxmemoryPolicy: noeviction
+    persistenceMode: journal-snapshot
+    ipAllowList: []
+
+  - type: web
+    name: amplicon-analysis-agent
+    runtime: docker
+    plan: pro plus
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: bash /app/scripts/start_render.sh
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    disk:
+      name: bioagent-workspace
+      mountPath: /workspace
+      sizeGB: 10
+    envVars:
+      - key: AMPLICON_WORKSPACE
+        value: /workspace
+      - key: AMPLICON_COOKIE_SECURE
+        value: "true"
+      - key: AMPLICON_MAX_UPLOAD_MB
+        value: "200"
+      - key: AMPLICON_MAX_TOTAL_UPLOAD_MB
+        value: "500"
+      - key: AMPLICON_MAX_USER_STORAGE_MB
+        value: "2048"
+      - key: AMPLICON_MAX_ACTIVE_JOBS
+        value: "1"
+      - key: AMPLICON_RETENTION_DAYS
+        value: "7"
+      - key: AMPLICON_ANALYSIS_TIMEOUT_SECONDS
+        value: "3600"
+      - key: AMPLICON_R_TIMEOUT_SECONDS
+        value: "1800"
+      - key: AMPLICON_WORKER_MEMORY_MB
+        value: "6000"
+      - key: AMPLICON_MONTHLY_MODEL_QUOTA
+        value: "10"
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: bioagent-queue
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: bioagent-queue
+          property: connectionString
+      - key: AMPLICON_BOOTSTRAP_INVITE
+        sync: false
+      - key: PRIVACY_CONTACT
+        sync: false
+      - key: MODEL_PROVIDER
+        sync: false
+      - key: MODEL_PROTOCOL
+        sync: false
+      - key: MODEL_BASE_URL
+        sync: false
+      - key: MODEL_NAME
+        sync: false
+      - key: MODEL_API_KEY
+        sync: false
+      - key: MODEL_ALLOWED_HOSTS
+        sync: false

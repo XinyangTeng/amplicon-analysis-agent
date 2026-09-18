@@ -20,6 +20,8 @@ Copy-Item .env.example .env
 
 打开 `http://127.0.0.1:8001`。公开介绍页位于 `/`，分析入口位于 `/app`。正式多用户测试应使用 Docker Compose，它会同时启动 Redis、Celery 分析 Worker 和自动清理服务。模型接口支持共享额度与用户自带 API Key；没有模型 API 也可以完成统计分析和固定报告。完整说明见 [`docs/WEB_APP.md`](docs/WEB_APP.md)。
 
+临时公网内测可以使用“GitHub Pages 介绍页 + Render 完整分析服务”。仓库已提供 `render.yaml`、同实例 Worker 启动脚本和 Pages 自动发布流程，具体步骤与费用限制见 [`docs/RENDER_GITHUB_PAGES_CN.md`](docs/RENDER_GITHUB_PAGES_CN.md)。
+
 面向 Claude Code 的可审计扩增子微生物组 MCP Server。首版从 ASV 丰度表、分类表和样本信息表开始，完成输入诊断、分析计划、一次性审批、R 分析、结果校验和 HTML 报告。
 
 项目级专家 Skill 已放在 `.claude/skills/amplicon-analysis/`，从仓库目录启动 Claude Code 时会自动发现；MCP Server 负责真正的文件检查、审批和分析执行。

@@ -72,6 +72,7 @@ COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 COPY r ./r
 COPY scripts/manage_access.py ./scripts/manage_access.py
+COPY scripts/start_render.sh ./scripts/start_render.sh
 RUN Rscript r/check_dependencies.R /tmp/dependency_status.csv
 RUN python3 -m pip install --break-system-packages --no-cache-dir \
     --retries 5 --timeout 60 --index-url "${PIP_INDEX_URL}" ".[web]"
