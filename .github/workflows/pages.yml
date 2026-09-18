@@ -1,0 +1,42 @@
+name: 发布 GitHub Pages 介绍页
+
+on:
+  push:
+    branches: [main, agent/web-pwa-clean]
+    paths:
+      - "src/amplicon_agent/web_static/landing.html"
+      - "src/amplicon_agent/web_static/style.css"
+      - "src/amplicon_agent/web_static/icon.svg"
+      - "scripts/build_pages_site.py"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 生成静态介绍页
+        env:
+          RENDER_APP_URL: ${{ vars.RENDER_APP_URL }}
+          PAGES_CANONICAL_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: python scripts/build_pages_site.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/github-pages
+      - name: 发布
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -90,7 +90,7 @@ cran <- c(
   "jsonlite", "ggplot2", "vegan", "tidyverse", "ggsci", "openxlsx", "ape",
   "picante", "minpack.lm", "Hmisc", "fs", "randomForest", "caret", "e1071",
   "glmnet", "rpart", "ipred", "ROCR", "ggpubr", "ggrepel", "patchwork",
-  "reshape2", "igraph", "ggraph", "pulsar", "ggalluvial", "corncob",
+  "reshape2", "igraph", "ggraph", "ggalluvial", "corncob",
   "GUniFrac", "zCompositions", "compositions",
   "robCompositions", "MicrobiomeStat", "microeco", "remotes",
   "agricolae", "ggvenn",
@@ -101,6 +101,9 @@ cran <- c(
 )
 if (run_phase("cran")) {
   install_cran(cran)
+  # pulsar was archived from the current CRAN repository. Keep the latest
+  # official archive release so SpiecEasi can be built on a clean R 4.5 image.
+  install_cran_version("pulsar", "0.3.13")
   # clarabel 0.11.2 provides the solver interface required by CVXR 1.8.2.
   # Its Cargo.lock v4 file is compiled with the Dockerfile's pinned Rust 1.85.
   install_cran_version("clarabel", "0.11.2")
