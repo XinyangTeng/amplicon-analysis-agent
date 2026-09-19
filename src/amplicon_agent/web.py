@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field, SecretStr
 
 from .auth import AuthStore, AuthUser, SessionIdentity
 from .function_registry import list_functions
+from .mail import send_verification_code
 from .model_client import (
     chat_completion,
     model_presets,
@@ -259,12 +260,17 @@ def public_config() -> dict[str, Any]:
     }
 
 
+class SendCodeRequest(BaseModel):
+    email: str
+
+
 class RegisterRequest(BaseModel):
     email: str
     password: str
     display_name: str = ""
     invite_code: str
     privacy_accepted: bool = False
+    code: str
 
 
 class LoginRequest(BaseModel):
@@ -283,6 +289,16 @@ def _auth_response(identity: SessionIdentity) -> dict[str, Any]:
     }
 
 
+@app.post("/api/auth/send-code")
+def send_code(request: SendCodeRequest) -> dict[str, str]:
+    try:
+        code = AuthStore().create_email_code(email=request.email)
+        send_verification_code(request.email, code)
+        return {"status": "sent"}
+    except Exception as exc:
+        raise api_error(exc)
+
+
 @app.post("/api/auth/register")
 def register(request: RegisterRequest, response: Response) -> dict[str, Any]:
     try:
@@ -293,6 +309,7 @@ def register(request: RegisterRequest, response: Response) -> dict[str, Any]:
             display_name=request.display_name,
             invite_code=request.invite_code,
             privacy_accepted=request.privacy_accepted,
+            code=request.code,
         )
         token, identity = store.create_session(user.user_id)
         _set_session_cookie(response, token)
@@ -1301,6 +1318,10 @@ app.mount("/assets", StaticFiles(directory=STATIC), name="assets")
 
 
 def main() -> None:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     import uvicorn
 
     uvicorn.run(

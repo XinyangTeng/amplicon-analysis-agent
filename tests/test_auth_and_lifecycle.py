@@ -11,12 +11,14 @@ from amplicon_agent.tasks import cleanup_expired_data
 
 def create_user(store: AuthStore, email: str):
     invite = store.create_invite(max_uses=1, valid_days=1)
+    code = store.create_email_code(email=email)
     return store.register(
         email=email,
         password="secure-pass-2026",
         display_name=email.split("@")[0],
         invite_code=invite,
         privacy_accepted=True,
+        code=code,
     )
 
 
@@ -127,3 +129,80 @@ def test_expired_upload_is_removed_by_cleanup_task(
         resource_id=upload_id,
         user_id=user.user_id,
     )
+
+
+def test_registration_requires_email_code(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AMPLICON_WORKSPACE", str(tmp_path))
+    store = AuthStore()
+    invite = store.create_invite(max_uses=1, valid_days=1)
+    with pytest.raises(ValueError, match="验证码"):
+        store.register(
+            email="no-code@example.org",
+            password="secure-pass-2026",
+            display_name="nocode",
+            invite_code=invite,
+            privacy_accepted=True,
+            code="000000",
+        )
+
+
+def test_email_code_flow_and_rate_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AMPLICON_WORKSPACE", str(tmp_path))
+    store = AuthStore()
+    code = store.create_email_code(email="flow@example.org")
+    assert len(code) == 6 and code.isdigit()
+
+    with pytest.raises(ValueError, match="频繁"):
+        store.create_email_code(email="flow@example.org")
+
+    wrong = str((int(code) + 1) % 1_000_000).zfill(6)
+    invite = store.create_invite(max_uses=1, valid_days=1)
+    with pytest.raises(ValueError, match="验证码错误"):
+        store.register(
+            email="flow@example.org",
+            password="secure-pass-2026",
+            display_name="flow",
+            invite_code=invite,
+            privacy_accepted=True,
+            code=wrong,
+        )
+
+    user = store.register(
+        email="flow@example.org",
+        password="secure-pass-2026",
+        display_name="flow",
+        invite_code=invite,
+        privacy_accepted=True,
+        code=code,
+    )
+    assert user.email == "flow@example.org"
+
+
+def test_email_code_expires(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AMPLICON_WORKSPACE", str(tmp_path))
+    store = AuthStore()
+    code = store.create_email_code(email="expire@example.org")
+    with store.connect() as connection:
+        connection.execute(
+            "UPDATE email_verifications SET expires_at = ? WHERE email = ?",
+            (iso_time(utc_now().replace(year=2020)), "expire@example.org"),
+        )
+    invite = store.create_invite(max_uses=1, valid_days=1)
+    with pytest.raises(ValueError, match="过期"):
+        store.register(
+            email="expire@example.org",
+            password="secure-pass-2026",
+            display_name="expire",
+            invite_code=invite,
+            privacy_accepted=True,
+            code=code,
+        )

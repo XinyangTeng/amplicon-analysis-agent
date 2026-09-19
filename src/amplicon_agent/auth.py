@@ -182,6 +182,14 @@ class AuthStore:
                         error TEXT
                     );
                     CREATE INDEX IF NOT EXISTS jobs_user_status_idx ON jobs(user_id, status);
+                    CREATE TABLE IF NOT EXISTS email_verifications (
+                        email TEXT PRIMARY KEY,
+                        code_hash TEXT NOT NULL,
+                        expires_at TEXT NOT NULL,
+                        attempts INTEGER NOT NULL DEFAULT 0,
+                        last_sent_at TEXT NOT NULL,
+                        verified_at TEXT
+                    );
                     """
                 )
             _INITIALIZED_DATABASES.add(self.database_path)
@@ -260,6 +268,83 @@ class AuthStore:
         if cursor.rowcount != 1:
             raise ValueError("邀请码记录不存在或已经撤销")
 
+    def create_email_code(self, *, email: str) -> str:
+        clean_email = _normalize_email(email)
+        now = utc_now()
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        with self.connect() as connection:
+            existing = connection.execute(
+                "SELECT last_sent_at FROM email_verifications WHERE email = ?",
+                (clean_email,),
+            ).fetchone()
+            if (
+                existing
+                and existing["last_sent_at"]
+                and parse_time(existing["last_sent_at"]) > now - timedelta(seconds=60)
+            ):
+                raise ValueError("验证码发送过于频繁，请稍后再试")
+            connection.execute(
+                """
+                INSERT INTO email_verifications(
+                    email, code_hash, expires_at, attempts, last_sent_at
+                ) VALUES (?, ?, ?, 0, ?)
+                ON CONFLICT(email) DO UPDATE SET
+                    code_hash = excluded.code_hash,
+                    expires_at = excluded.expires_at,
+                    attempts = 0,
+                    last_sent_at = excluded.last_sent_at,
+                    verified_at = NULL
+                """,
+                (
+                    clean_email,
+                    token_hash(code),
+                    iso_time(now + timedelta(minutes=10)),
+                    iso_time(now),
+                ),
+            )
+        return code
+
+    def verify_email_code(self, *, email: str, code: str) -> None:
+        clean_email = _normalize_email(email)
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT code_hash, expires_at, attempts
+                FROM email_verifications WHERE email = ?
+                """,
+                (clean_email,),
+            ).fetchone()
+            if not row:
+                connection.execute("ROLLBACK")
+                raise ValueError("请先获取邮箱验证码")
+            if parse_time(row["expires_at"]) <= now:
+                connection.execute("ROLLBACK")
+                raise ValueError("验证码已过期，请重新获取")
+            if int(row["attempts"]) >= 5:
+                connection.execute("ROLLBACK")
+                raise ValueError("验证码错误次数过多，请重新获取")
+            if not hmac.compare_digest(row["code_hash"], token_hash(code.strip())):
+                connection.execute(
+                    "UPDATE email_verifications SET attempts = attempts + 1 WHERE email = ?",
+                    (clean_email,),
+                )
+                connection.execute("COMMIT")
+                raise ValueError("验证码错误")
+            connection.execute(
+                "UPDATE email_verifications SET verified_at = ? WHERE email = ?",
+                (iso_time(now), clean_email),
+            )
+            connection.execute("COMMIT")
+
+    def _consume_email_code(self, email: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM email_verifications WHERE email = ?",
+                (email,),
+            )
+
     def register(
         self,
         *,
@@ -268,8 +353,10 @@ class AuthStore:
         display_name: str,
         invite_code: str,
         privacy_accepted: bool,
+        code: str,
     ) -> AuthUser:
         clean_email = _normalize_email(email)
+        self.verify_email_code(email=clean_email, code=code)
         _validate_password(password)
         clean_name = display_name.strip()[:80] or clean_email.split("@", 1)[0]
         if not privacy_accepted:
@@ -327,6 +414,7 @@ class AuthStore:
             except Exception:
                 connection.execute("ROLLBACK")
                 raise
+        self._consume_email_code(clean_email)
         return self.get_user(user_id)
 
     def authenticate_password(self, email: str, password: str) -> AuthUser:

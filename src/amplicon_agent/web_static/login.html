@@ -38,6 +38,12 @@
       </form>
       <form id="register-form" class="auth-form hidden">
         <label><span>邮箱</span><input type="email" name="email" autocomplete="email" required></label>
+        <label><span>邮箱验证码</span>
+          <div class="code-row">
+            <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位数字" required>
+            <button type="button" class="button" id="send-code">发送验证码</button>
+          </div>
+        </label>
         <label><span>显示名称</span><input name="display_name" autocomplete="name" placeholder="报告与账户中显示"></label>
         <label><span>密码</span><input type="password" name="password" autocomplete="new-password" minlength="10" placeholder="至少 10 位，同时包含字母和数字" required></label>
         <label><span>邀请码</span><input name="invite_code" autocomplete="one-time-code" required></label>

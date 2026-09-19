@@ -118,6 +118,9 @@ def save_analysis_interpretation(plan_id: str, interpretation: dict[str, object]
 
 
 def main() -> None:
+    from dotenv import load_dotenv
+
+    load_dotenv()
     mcp.run(transport="stdio")
 
 

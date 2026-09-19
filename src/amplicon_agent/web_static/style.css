@@ -399,6 +399,9 @@ footer a { text-decoration: none; }
 .auth-form { display: grid; gap: 16px; }
 .auth-form .check-row { margin: 0; }
 .auth-form .check-row a { margin-left: 3px; }
+.auth-form .code-row { display: flex; gap: 8px; }
+.auth-form .code-row input { flex: 1; min-width: 0; }
+.auth-form .code-row button { flex: none; white-space: nowrap; }
 .auth-footnote { color: var(--faint); font-size: .78rem; line-height: 1.6; margin: 18px 0 0; }
 
 .policy-document {

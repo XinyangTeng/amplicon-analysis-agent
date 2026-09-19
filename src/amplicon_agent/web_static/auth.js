@@ -63,6 +63,50 @@ document.querySelector("#register-form").addEventListener("submit", (event) => {
   submitAuth(event, "/api/auth/register");
 });
 
+const sendCodeButton = document.querySelector("#send-code");
+
+function startCountdown(seconds) {
+  sendCodeButton.disabled = true;
+  const original = "发送验证码";
+  let remaining = seconds;
+  sendCodeButton.textContent = `${remaining}s`;
+  const timer = setInterval(() => {
+    remaining -= 1;
+    if (remaining <= 0) {
+      clearInterval(timer);
+      sendCodeButton.disabled = false;
+      sendCodeButton.textContent = original;
+    } else {
+      sendCodeButton.textContent = `${remaining}s`;
+    }
+  }, 1000);
+}
+
+sendCodeButton.addEventListener("click", async () => {
+  const email = document.querySelector("#register-form input[name=email]").value.trim();
+  if (!email) {
+    showNotice("请先填写邮箱地址");
+    return;
+  }
+  sendCodeButton.disabled = true;
+  sendCodeButton.textContent = "发送中…";
+  try {
+    const response = await fetch("/api/auth/send-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || "发送失败");
+    showNotice("验证码已发送，请查收邮件", "success");
+    startCountdown(60);
+  } catch (error) {
+    showNotice(error.message);
+    sendCodeButton.disabled = false;
+    sendCodeButton.textContent = "发送验证码";
+  }
+});
+
 fetch("/api/auth/me").then((response) => {
   if (response.ok) location.href = returnPath();
 }).catch(() => {});

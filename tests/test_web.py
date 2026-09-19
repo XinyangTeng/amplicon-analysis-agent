@@ -32,6 +32,7 @@ def register_user(
     email: str = "researcher@example.org",
 ) -> dict:
     invite = AuthStore().create_invite(label="test", max_uses=1, valid_days=1)
+    code = AuthStore().create_email_code(email=email)
     response = client.post(
         "/api/auth/register",
         json={
@@ -40,6 +41,7 @@ def register_user(
             "password": "secure-pass-2026",
             "invite_code": invite,
             "privacy_accepted": True,
+            "code": code,
         },
     )
     assert response.status_code == 200, response.text
@@ -114,24 +116,46 @@ def test_public_landing_auth_gate_and_registry(client: TestClient) -> None:
 
 def test_invite_is_single_use_and_csrf_is_required(client: TestClient) -> None:
     invite = AuthStore().create_invite(label="single", max_uses=1, valid_days=1)
+    first_code = AuthStore().create_email_code(email="first@example.org")
     payload = {
         "email": "first@example.org",
         "display_name": "First",
         "password": "secure-pass-2026",
         "invite_code": invite,
         "privacy_accepted": True,
+        "code": first_code,
     }
     first = client.post("/api/auth/register", json=payload)
     assert first.status_code == 200
+    second_code = AuthStore().create_email_code(email="second@example.org")
     second = client.post(
         "/api/auth/register",
-        json={**payload, "email": "second@example.org"},
+        json={**payload, "email": "second@example.org", "code": second_code},
     )
     assert second.status_code == 400
 
     client.headers.pop("X-CSRF-Token", None)
     blocked = client.post("/api/auth/logout", json={})
     assert blocked.status_code == 403
+
+
+def test_send_code_endpoint_and_rate_limit(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sent: dict[str, str] = {}
+    monkeypatch.setattr(
+        "amplicon_agent.web.send_verification_code",
+        lambda email, code: sent.update(email=email, code=code),
+    )
+    response = client.post("/api/auth/send-code", json={"email": "new@example.org"})
+    assert response.status_code == 200, response.text
+    assert response.json() == {"status": "sent"}
+    assert sent["email"] == "new@example.org"
+    assert len(sent["code"]) == 6 and sent["code"].isdigit()
+
+    repeated = client.post("/api/auth/send-code", json={"email": "new@example.org"})
+    assert repeated.status_code == 400
 
 
 def test_inspect_prepare_and_user_isolation(client: TestClient) -> None:
